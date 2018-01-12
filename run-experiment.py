@@ -44,8 +44,6 @@ class Executor(object):
             print('CalledProcessError:', e, file=self._logFp)
             print('STDOUT:\n%s' % e.stdout, file=self._logFp)
             print('STDERR:\n%s' % e.stderr, file=self._logFp)
-            if e.stderr:
-                print(e.stderr, file=sys.stderr)
             raise
 
         if result.stdout:

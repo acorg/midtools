@@ -67,7 +67,7 @@ if __name__ == '__main__':
     print('Read %d aligned reads. Found %d significant locations.' %
           (len(alignedReads), len(significantOffsets)))
 
-    fig = tools.make_subplots(rows=2, cols=1, shared_xaxes=True,
+    fig = tools.make_subplots(rows=2, cols=1,
                               subplot_titles=('a', 'b'))
 
     plotCoverage(fig, 1, 1, readCountAtOffset, len(genome))
