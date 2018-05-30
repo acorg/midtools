@@ -2,6 +2,7 @@
 
 from __future__ import division, print_function
 
+import sys
 from collections import Counter
 from math import log10
 
@@ -33,8 +34,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    (genome, alignedReads, readCountAtLocation,
-     baseCountAtLocation, readsAtLocation) = parseCommandLineOptions(args)
+    (genome, alignedReads, readCountAtLocation, baseCountAtLocation,
+     readsAtLocation, _) = parseCommandLineOptions(args, False)
+
+    print('Read %d aligned reads.' % len(alignedReads), file=sys.stderr)
 
     genomeLength = len(genome)
     genomeLengthWidth = int(log10(genomeLength)) + 1
@@ -46,5 +49,5 @@ if __name__ == '__main__':
             base = read.base(offset)
             if base in nucleotides:
                 counts[base] += 1
-        print('Offset %*d: base counts %s' % (
-            genomeLengthWidth, offset, baseCountsToStr(counts)))
+        print('Location %*d: base counts %s' % (
+            genomeLengthWidth, offset + 1, baseCountsToStr(counts)))

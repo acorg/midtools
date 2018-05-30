@@ -96,16 +96,20 @@ parser.add_argument(
     help='Print verbose textual output.')
 
 parser.add_argument(
+    '--dataOnly', action='store_true', default=False,
+    help='If specified, only generate the genomes and reads, then exit.')
+
+parser.add_argument(
     '--dryRun', action='store_true', default=False,
     help='If specified, simply print the actions that would be taken.')
 
 parser.add_argument(
     '--genome2MutationRate', type=float, default=0.075,
-    help='The per-base mutation rate to use to create genome 2')
+    help='The per-base mutation rate to use to create the second genome.')
 
 parser.add_argument(
     '--readCount', type=int, default=100,
-    help=('The number of reads to create for both genomees (only used '
+    help=('The number of reads to create for both genomes (only used '
           'if --genome-1-read-count or genome-2-read-count are not given).'))
 
 parser.add_argument(
@@ -146,13 +150,14 @@ parser.add_argument(
     '--homogeneousCutoff', type=float, default=0.85,
     help=('If the most common nucleotide at a location occurs more than '
           'this fraction of the time (i.e., amongst all reads that cover '
-          'the location) then the locaion will be considered homogeneous '
+          'the location) then the location will be considered homogeneous '
           'and therefore uninteresting.'))
 
 parser.add_argument(
     '--agreementCutoff', type=float, default=0.9,
-    help=('Only reads that agree at least this much will be considered '
-          'connected by connected-components.py.'))
+    help=('Only reads that agree at at least this fraction of their shared '
+          'significant locations this much will be considered connected by '
+          'connected-components.py.'))
 
 parser.add_argument(
     '--genome1ReadCount', type=int,
@@ -318,6 +323,9 @@ else:
     # will be part of a string that will be parsed by the shell.
     readCategoryRegexArg = "'^genome-1-' '^genome-2-'"
     readCategoryRegexNamesArg = "'Genome 1' 'Genome 2'"
+
+if args.dataOnly:
+    sys.exit(0)
 
 connectedComponentJSON = join(outputDir, 'connected-components.json')
 showComponents = '--show' if args.showComponents else ''

@@ -8,12 +8,11 @@ import plotly.graph_objs as go
 from random import uniform
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
 
-from data.data import (
-    addCommandLineOptions, parseCommandLineOptions, findSignificantOffsets)
+from data.data import addCommandLineOptions, parseCommandLineOptions
 
 
 def plotConsistency(significantOffsets, baseCountAtOffset,
-                    readsAtOffset, outFile, title, jitter):
+                    readsAtOffset, outFile, title, jitter, show):
     """
     """
     x = []
@@ -62,7 +61,7 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
         })
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile)
+    plotly.offline.plot(fig, filename=outFile, auto_open=show, show_link=False)
 
 
 if __name__ == '__main__':
@@ -84,13 +83,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     (genome, alignedReads, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset) = parseCommandLineOptions(args)
+     baseCountAtOffset, readsAtOffset,
+     significantOffsets) = parseCommandLineOptions(args, True)
 
     genomeLength = len(genome)
-
-    significantOffsets = list(findSignificantOffsets(
-        baseCountAtOffset, readCountAtOffset, args.minReads,
-        args.homogeneousCutoff))
 
     print('Read %d aligned reads. Found %d significant locations.' %
           (len(alignedReads), len(significantOffsets)))
@@ -101,4 +97,4 @@ if __name__ == '__main__':
          'jitter added' if args.jitter else 'no jitter'))
 
     plotConsistency(significantOffsets, baseCountAtOffset, readsAtOffset,
-                    args.outFile, title, args.jitter)
+                    args.outFile, title, args.jitter, args.show)

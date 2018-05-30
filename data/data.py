@@ -13,6 +13,8 @@ class AlignedRead(object):
     """
     def __init__(self, read):
         sequence = read.sequence.upper()
+        # self.significantOffsets is monkey patched :-(
+        self.significantOffsets = None
 
         # Scan for initial gaps.
         offset = 0
@@ -21,6 +23,9 @@ class AlignedRead(object):
                 offset += 1
             else:
                 break
+
+        if offset == len(read):
+            raise ValueError('Read is all gaps.')
 
         # Scan for final gaps.
         trailing = 0
@@ -38,8 +43,29 @@ class AlignedRead(object):
         self.offset = offset
 
     def __str__(self):
-        return '<AlignedRead: (offset %4d, len %2d) %s>' % (
-            self.offset, len(self.read), self.read.id)
+        if self.significantOffsets is not None:
+            bases = []
+            offsets = []
+            for offset in self.significantOffsets:
+                base = self.base(offset)
+                if base is None:
+                    if bases:
+                        # We hit a non-covered offset after some offsets were
+                        # already covered (because bases is not empty), so we
+                        # can break because we've gone beyond the end of the
+                        # read. (This assumes the significant offsets are
+                        # sorted increasingly, which they are.)
+                        break
+                else:
+                    bases.append(base)
+                    offsets.append(offset)
+            bases = ', bases %s, offsets %s' % (
+                ''.join(bases), ','.join(map(str, offsets)))
+        else:
+            bases = ''
+
+        return '<AlignedRead: (offset %4d, len %2d%s) %s>' % (
+            self.offset, len(self.read), bases, self.read.id)
 
     def base(self, n):
         """
@@ -102,7 +128,7 @@ def gatherData(genomeLength, alignedReads):
 
 
 def findSignificantOffsets(baseCountAtOffset, readCountAtOffset,
-                             minReads, homogeneousCutoff):
+                           minReads, homogeneousCutoff):
     """
     Find the genome offsets that have significant base variability.
 
@@ -117,6 +143,7 @@ def findSignificantOffsets(baseCountAtOffset, readCountAtOffset,
         nucleotide at a offset occurs *more than* this fraction of the time
         (i.e., amongst all reads that cover the offset) then the locaion
         will be considered homogeneous and therefore uninteresting.
+    @return: A generator that yields 0-based significant offsets.
     """
     for offset, (readCount, counts) in enumerate(
             zip(readCountAtOffset, baseCountAtOffset)):
@@ -136,9 +163,11 @@ def addCommandLineOptions(parser, outfileDefaultName=None):
     addFASTACommandLineOptions(parser)
 
     parser.add_argument(
-        '--genomeFile', required=True,
+        '--genomeFile',
         help=('The filename of the FASTA file containing the supposed genome '
-              'that the reads came from.'))
+              'that the reads came from. If this is not given, the first '
+              'sequence found in the FASTA input will be used as the '
+              'reference genome.'))
 
     parser.add_argument(
         '--outFile', default=outfileDefaultName,
@@ -155,7 +184,7 @@ def addCommandLineOptions(parser, outfileDefaultName=None):
               'read (to try to remove possible damage).'))
 
     parser.add_argument(
-        '--homogeneousCutoff', type=float, default=0.85,
+        '--homogeneousCutoff', type=float, default=0.9,
         help=('If the most common nucleotide at a location occurs more than '
               'this fraction of the time (i.e., amongst all reads that cover '
               'the location) then the locaion will be considered homogeneous '
@@ -166,7 +195,7 @@ def addCommandLineOptions(parser, outfileDefaultName=None):
         help='If specified, show the figure interactively.')
 
 
-def parseCommandLineOptions(args):
+def parseCommandLineOptions(args, findSigOffsets):
     """
     Deal with the various command-line options added to the ArgumentParser
     instance by addCommandLineOptions.
@@ -174,33 +203,56 @@ def parseCommandLineOptions(args):
     @param args: The result of calling C{parse_args} on an C{ArgumentParser}
         instance (the one that was passed to C{addCommandLineOptions}, unless
         we're testing).
+    @param findSigOffsets: If C{True} also return a list of the significant
+        offsets (else that element of the return value will be C{None}).
     @return: A 5-tuple: (genomeLength, alignedReads, readCountAtOffset,
-        baseCountAtOffset, readsAtOffset)
+        baseCountAtOffset, readsAtOffset, significantOffsets)
     """
-    genomeReads = list(FastaReads(args.genomeFile))
-    assert len(genomeReads) == 1, (
-        'The genome file %s has %d sequences in it. Expected just one.' %
-        len(genomeReads))
-    genome = genomeReads[0]
-    genomeLength = len(genome)
+    if args.genomeFile:
+        # The reference genome is in a separate file.
+        genomeReads = list(FastaReads(args.genomeFile))
+        assert len(genomeReads) == 1, (
+            'The genome file %s has %d sequences in it. Expected just one.' %
+            len(genomeReads))
+        genome = genomeReads[0]
+        genomeLength = len(genome)
 
     reads = parseFASTACommandLineOptions(args)
     alignedReads = []
     trim = args.trim
     for count, read in enumerate(reads, start=1):
-        assert len(read) == genomeLength, (
-            'Read number %d with id %r in %s had unexpected length (%d '
-            'instead of %d)' %
-            (count, read.id, args.fastaFile, len(read), genomeLength))
-        ar = AlignedRead(read)
-        if trim:
-            if ar.trim(trim):
-                alignedReads.append(ar)
+        if count == 1 and not args.genomeFile:
+            # The reference genome is the first sequence in the input FASTA.
+            genome = read
+            genomeLength = len(genome)
         else:
-            alignedReads.append(ar)
+            assert len(read) == genomeLength, (
+                'Read number %d with id %r in %s had unexpected length (%d '
+                'instead of %d)' %
+                (count, read.id, args.fastaFile, len(read), genomeLength))
+            try:
+                ar = AlignedRead(read)
+            except ValueError as e:
+                # Ignore reads that are all gaps.
+                assert str(e) == 'Read is all gaps.'
+            else:
+                if trim:
+                    if ar.trim(trim):
+                        alignedReads.append(ar)
+                else:
+                    alignedReads.append(ar)
 
     readCountAtOffset, baseCountAtOffset, readsAtOffset = gatherData(
         genomeLength, alignedReads)
 
+    if findSigOffsets:
+        significantOffsets = list(findSignificantOffsets(
+            baseCountAtOffset, readCountAtOffset, args.minReads,
+            args.homogeneousCutoff))
+        for read in alignedReads:
+            read.significantOffsets = significantOffsets
+    else:
+        significantOffsets = None
+
     return (genome, alignedReads, readCountAtOffset, baseCountAtOffset,
-            readsAtOffset)
+            readsAtOffset, significantOffsets)

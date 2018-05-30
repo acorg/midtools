@@ -15,6 +15,10 @@ class Node(set):
     def __hash__(self):
         return self.read.__hash__()
 
+    def __lt__(self, other):
+        return (self.read.offset, self.read.read.id) < (
+            other.read.offset, other.read.read.id)
+
     def neighbors(self):
         return set(self)
 

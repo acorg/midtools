@@ -7,8 +7,7 @@ import plotly.graph_objs as go
 
 from sklearn.metrics import adjusted_rand_score  # , adjusted_mutual_info_score
 
-from data.data import (
-    addCommandLineOptions, parseCommandLineOptions, findSignificantOffsets)
+from data.data import addCommandLineOptions, parseCommandLineOptions
 from data.nid import normalized_information_distance
 
 
@@ -17,7 +16,7 @@ def zeroScore(_, __):
 
 
 def plotConsistency(significantOffsets, baseCountAtOffset,
-                    readsAtOffset, minCommonReads, outFile, title):
+                    readsAtOffset, minCommonReads, outFile, title, show):
     """
     """
     scores = []
@@ -105,7 +104,7 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
     layout = go.Layout(layoutDict)
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile)
+    plotly.offline.plot(fig, filename=outFile, auto_open=show, show_link=False)
 
 
 if __name__ == '__main__':
@@ -130,11 +129,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     (genome, alignedReads, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset) = parseCommandLineOptions(args)
-
-    significantOffsets = list(findSignificantOffsets(
-        baseCountAtOffset, readCountAtOffset, args.minReads,
-        args.homogeneousCutoff))
+     baseCountAtOffset, readsAtOffset,
+     significantOffsets) = parseCommandLineOptions(args, True)
 
     print('Read %d aligned reads of length %d. '
           'Found %d significant offsets.' %
@@ -145,4 +141,4 @@ if __name__ == '__main__':
         'diagonal, NID below' % len(significantOffsets))
 
     plotConsistency(significantOffsets, baseCountAtOffset, readsAtOffset,
-                    args.minCommonReads, args.outFile, title)
+                    args.minCommonReads, args.outFile, title, args.show)

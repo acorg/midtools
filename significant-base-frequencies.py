@@ -2,19 +2,18 @@
 
 from __future__ import division, print_function
 
+import sys
 from os.path import basename
 import plotly
 import plotly.graph_objs as go
 from operator import itemgetter
-from sklearn.metrics.cluster import entropy
+from json import dump
 
 from dark.reads import readClassNameToClass
 
 from data.data import (
-    AlignedRead, addCommandLineOptions, parseCommandLineOptions,
-    findSignificantOffsets, gatherData)
-
-MAX_ENTROPY = 1.3
+    AlignedRead, addCommandLineOptions, parseCommandLineOptions, gatherData)
+from data.entropy import entropy2, MAX_ENTROPY
 
 
 def baseCountsToStr(counts):
@@ -27,7 +26,7 @@ def baseCountsToStr(counts):
 
 def plotSortedMaxBaseFrequencies(
         significantOffsets, baseCountAtOffset, readCountAtOffset, outFile,
-        title, histogram):
+        title, histogram, show):
     """
     Plot the sorted maximum base frequency for each of the significant
     offsets.
@@ -47,28 +46,30 @@ def plotSortedMaxBaseFrequencies(
 
         frequencyInfo.append((sortedFreqs[0], text))
 
+    # We don't have to sort if we're making a histogram, but we're expected
+    # to return a sorted values list, so we sort unconditionally.
+    frequencyInfo.sort(key=itemgetter(0))
+    values = [freq for freq, _ in frequencyInfo]
+
     if histogram:
         data = [
-            go.Histogram(x=[freq for freq, _ in frequencyInfo],
-                         histnorm='probability'),
+            go.Histogram(x=values, histnorm='probability'),
         ]
 
         xaxis = {
-            'title': 'Maximum base nucleotide frequency',
+            'title': 'Significant location maximum nucleotide frequency',
             'range': (-0.05, 1.05),
         }
 
         yaxis = {
-            'title': 'Frequency',
+            'title': 'Probability mass',
             'range': (0.0, 1.0),
         }
     else:
-        frequencyInfo.sort(key=itemgetter(0))
-
         data = [
             go.Scatter(
                 x=list(range(1, len(significantOffsets) + 1)),
-                y=[freq for freq, _ in frequencyInfo],
+                y=values,
                 mode='markers',
                 showlegend=False,
                 text=[text for _, text in frequencyInfo]),
@@ -76,23 +77,24 @@ def plotSortedMaxBaseFrequencies(
 
         xmargin = max(1, int(len(significantOffsets) * 0.01))
         xaxis = {
-            'title': 'Significant location maximum nucleotide frequency rank',
+            'title': 'Rank',
             'range': (-xmargin, len(significantOffsets) + xmargin),
         }
 
         yaxis = {
             'range': (0.0, 1.05),
-            'title': 'Frequency',
+            'title': 'Significant location maximum nucleotide frequency',
         }
 
     layout = go.Layout(title=title, xaxis=xaxis, yaxis=yaxis)
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile, show_link=False)
+    plotly.offline.plot(fig, filename=outFile, auto_open=show, show_link=False)
+    return frequencyInfo
 
 
 def plotBaseFrequenciesEntropy(
         significantOffsets, baseCountAtOffset, readCountAtOffset, outFile,
-        title, histogram):
+        title, histogram, show):
     """
     Plot the sorted entropy of base frequencies for each of the significant
     offsets.
@@ -105,32 +107,35 @@ def plotBaseFrequenciesEntropy(
                           for k, v in baseCountAtOffset[offset].items()))
 
         entropyInfo.append(
-            (entropy(list(baseCountAtOffset[offset].elements())), text))
+            (entropy2(list(baseCountAtOffset[offset].elements())), text))
 
     assert all([ent <= MAX_ENTROPY for ent, _ in entropyInfo])
 
+    # We don't have to sort if we're making a histogram, but we're expected
+    # to return a sorted values list, so we sort unconditionally.
+    entropyInfo.sort(key=itemgetter(0))
+    values = [ent for ent, _ in entropyInfo]
+
     if histogram:
         data = [
-            go.Histogram(x=[ent for ent, _ in entropyInfo],
-                         histnorm='probability')
+            go.Histogram(x=values, histnorm='probability')
         ]
 
         xaxis = {
-            'title': 'Entropy',
+            'title': ('Significant location nucleotide frequency entropy '
+                      '(bits)'),
             'range': (-0.05, MAX_ENTROPY),
         }
 
         yaxis = {
-            'title': 'Frequency',
+            'title': 'Probability mass',
             'range': (0.0, 1.0),
         }
     else:
-        entropyInfo.sort(key=itemgetter(0))
-
         data = [
             go.Scatter(
                 x=list(range(1, len(significantOffsets) + 1)),
-                y=[ent for ent, _ in entropyInfo],
+                y=values,
                 mode='markers',
                 showlegend=False,
                 text=[text for _, text in entropyInfo]),
@@ -138,23 +143,24 @@ def plotBaseFrequenciesEntropy(
 
         xmargin = max(1, int(len(significantOffsets) * 0.01))
         xaxis = {
-            'title': ('Significant location nucleotide frequency '
-                      'entropy rank'),
             'range': (-xmargin, len(significantOffsets) + xmargin),
+            'title': 'Rank',
         }
 
         yaxis = {
             'range': (-0.05, MAX_ENTROPY),
-            'title': 'Entropy',
+            'title': ('Significant location nucleotide frequency entropy '
+                      '(bits)'),
         }
 
     layout = go.Layout(title=title, xaxis=xaxis, yaxis=yaxis)
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile, show_link=False)
+    plotly.offline.plot(fig, filename=outFile, auto_open=show, show_link=False)
+    return entropyInfo
 
 
 def plotBaseFrequencies(significantOffsets, baseCountAtOffset,
-                        readCountAtOffset, outFile, title):
+                        readCountAtOffset, outFile, title, show):
     """
     Plot the (sorted) base frequencies for each of the significant offsets.
     """
@@ -181,9 +187,6 @@ def plotBaseFrequencies(significantOffsets, baseCountAtOffset,
             ', '.join('%s: %d' % (k, v)
                       for k, v in baseCountAtOffset[offset].items()))
 
-        # print('loc %d, counts %s, freqs %s' % (offset,
-        # baseCountAtOffset[offset], sortedFreqs))
-
     data = [
         go.Bar(x=x, y=freqs[0], showlegend=False, text=text),
         go.Bar(x=x, y=freqs[1], showlegend=False),
@@ -202,7 +205,7 @@ def plotBaseFrequencies(significantOffsets, baseCountAtOffset,
     )
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile, show_link=False)
+    plotly.offline.plot(fig, filename=outFile, auto_open=show, show_link=False)
 
 
 if __name__ == '__main__':
@@ -210,7 +213,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description='Analyze a set of aligned reads.')
+        description=('Show significant genome location nucleotide '
+                     'frequencies for a set of aligned reads.'))
 
     addCommandLineOptions(parser, 'significant-base-frequencies.html')
 
@@ -241,16 +245,25 @@ if __name__ == '__main__':
         help=('If specified and --sortOn is used, the values (according to '
               '--sortOn) will be shown in a histogram.'))
 
+    parser.add_argument(
+        '--valuesFile',
+        help=('The filename to write the raw max or entropy scores to (as a '
+              'JSON list). This option can only be used if --sortOn is used.'))
+
     args = parser.parse_args()
 
+    if args.valuesFile and args.sortOn is None:
+        print('You have specified a file to write sorted location values '
+              'to (using --valuesFile) but have not specified what to '
+              'sort on using --sortOn. Choices are "max" or "entropy".',
+              file=sys.stderr)
+        sys.exit(1)
+
     (genome, alignedReads, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset) = parseCommandLineOptions(args)
+     baseCountAtOffset, readsAtOffset,
+     significantOffsets) = parseCommandLineOptions(args, True)
 
     genomeLength = len(genome)
-
-    significantOffsets = list(findSignificantOffsets(
-        baseCountAtOffset, readCountAtOffset, args.minReads,
-        args.homogeneousCutoff))
 
     print('Read %d aligned reads of length %d. '
           'Found %d significant locations.' %
@@ -309,33 +322,43 @@ if __name__ == '__main__':
         subtitle += ' Reads trimmed by %d base%s.' % (
             args.trim, '' if args.trim == 1 else 's')
 
-    if args.show:
-        if args.sortOn is None:
-            if args.sampleName:
-                title = '%s base frequencies (sorted)' % args.sampleName
-            else:
-                title = 'Base frequencies (sorted)'
-            plotBaseFrequencies(significantOffsets, baseCountAtOffset,
-                                readCountAtOffset, args.outFile,
-                                title + subtitle)
-        elif args.sortOn == 'max':
-            if args.sampleName:
-                title = '%s maximum base frequency' % args.sampleName
-            else:
-                title = 'Maximum base frequency'
-            plotSortedMaxBaseFrequencies(
-                significantOffsets, baseCountAtOffset,
-                readCountAtOffset, args.outFile, title + subtitle,
-                args.histogram)
+    if args.sortOn is None:
+        if args.sampleName:
+            title = '%s base frequencies (sorted)' % args.sampleName
         else:
-            # Must be entropy (due to the 'choices' arg to the arg parser).
-            assert args.sortOn == 'entropy', (
-                'Unknown --sortOn value: %r' % args.sortOn)
-            if args.sampleName:
-                title = '%s base frequency entropy' % args.sampleName
-            else:
-                title = 'Base frequency entropy'
-            plotBaseFrequenciesEntropy(
-                significantOffsets, baseCountAtOffset,
-                readCountAtOffset, args.outFile, title + subtitle,
-                args.histogram)
+            title = 'Base frequencies (sorted)'
+        plotBaseFrequencies(significantOffsets, baseCountAtOffset,
+                            readCountAtOffset, args.outFile,
+                            title + subtitle, args.show)
+    elif args.sortOn == 'max':
+        if args.sampleName:
+            title = '%s maximum base frequency' % args.sampleName
+        else:
+            title = 'Maximum base frequency'
+        result = plotSortedMaxBaseFrequencies(
+            significantOffsets, baseCountAtOffset,
+            readCountAtOffset, args.outFile, title + subtitle,
+            args.histogram, args.show)
+    else:
+        # Must be entropy (due to the 'choices' arg to the arg parser).
+        assert args.sortOn == 'entropy', (
+            'Unknown --sortOn value: %r' % args.sortOn)
+        if args.sampleName:
+            title = '%s base frequency entropy' % args.sampleName
+        else:
+            title = 'Base frequency entropy'
+        result = plotBaseFrequenciesEntropy(
+            significantOffsets, baseCountAtOffset,
+            readCountAtOffset, args.outFile, title + subtitle,
+            args.histogram, args.show)
+
+    if args.valuesFile:
+        with open(args.valuesFile, 'w') as fp:
+            dump(
+                {
+                    'sampleName': args.sampleName,
+                    'text': [text for _, text in result],
+                    'values': [value for value, _ in result],
+                },
+                fp
+            )

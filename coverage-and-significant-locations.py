@@ -6,8 +6,7 @@ import plotly
 import plotly.graph_objs as go
 from plotly import tools
 
-from data.data import (
-    addCommandLineOptions, parseCommandLineOptions, findSignificantOffsets)
+from data.data import addCommandLineOptions, parseCommandLineOptions
 
 
 def plotCoverage(fig, row, col, readCountAtOffset, genomeLength):
@@ -58,11 +57,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     (genome, alignedReads, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset) = parseCommandLineOptions(args)
-
-    significantOffsets = list(findSignificantOffsets(
-        baseCountAtOffset, readCountAtOffset, args.minReads,
-        args.homogeneousCutoff))
+     baseCountAtOffset, readsAtOffset,
+     significantOffsets) = parseCommandLineOptions(args, True)
 
     print('Read %d aligned reads. Found %d significant locations.' %
           (len(alignedReads), len(significantOffsets)))

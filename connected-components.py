@@ -9,39 +9,16 @@ import re
 import colorlover
 from collections import Counter
 from pathlib import Path  # This is Python 3 only.
-from os.path import join
+from os.path import join, exists
 from math import log10
-from os import unlink
+from os import unlink, mkdir
 from itertools import chain
-
 from collections import defaultdict
-# from time import time, ctime
-# import sys
 
-from data.data import (
-    addCommandLineOptions, parseCommandLineOptions, findSignificantOffsets)
+from data.data import addCommandLineOptions, parseCommandLineOptions
+from dark.dna import AMBIGUOUS
 from data.graph import Node, connectedComponents, componentOffsets
 from dark.reads import Read
-
-# The following does not include a code for all possible sets of
-# nucleotides. Why?
-AMBIGUOUS = {
-    'A': {'A'},
-    'C': {'C'},
-    'G': {'G'},
-    'T': {'T'},
-    'M': {'A', 'C'},
-    'R': {'A', 'G'},
-    'W': {'A', 'T'},
-    'S': {'G', 'C'},
-    'K': {'G', 'T'},
-    'Y': {'C', 'T'},
-    'V': {'A', 'C', 'G'},
-    'H': {'A', 'C', 'T'},
-    'D': {'A', 'G', 'T'},
-    'B': {'C', 'G', 'T'},
-    'N': {'A', 'C', 'G', 'T'},
-}
 
 # Make a reverse version of AMBIGUOUS.
 BASES_TO_AMBIGUOUS = {}
@@ -59,12 +36,14 @@ def baseCountsToStr(counts):
 
 def plotComponents(components, categoryRegexs, categoryNames, genomeLength,
                    significantOffsets, outFile, title, additionalOffsets,
-                   additionalOffsetsTitle):
+                   additionalOffsetsTitle, show):
     """
     Show all connected components in a plot, as well as the significant
     locations and any additional locations.
     """
     offsetsForLevel = []
+    categoryRegexs = categoryRegexs or []
+    categoryNames = categoryNames or ['unnamed']
     compiledCategoryRegexs = list(map(re.compile, categoryRegexs))
     nCategories = len(categoryRegexs)
     nColorCategories = max(
@@ -194,7 +173,7 @@ def plotComponents(components, categoryRegexs, categoryNames, genomeLength,
         layout['title'] = title
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile, show_link=False)
+    plotly.offline.plot(fig, filename=outFile, show_link=False, auto_open=show)
 
 
 if __name__ == '__main__':
@@ -234,7 +213,8 @@ if __name__ == '__main__':
         help=('Specify regular expressions that match read ids for the '
               'purpose of plotting components and showing their catgeory '
               'composition. The category will normally be something that '
-              'indicates to which genome a read belongs.'))
+              'indicates to which genome a read belongs (when this is known, '
+              'as is the case with simulated data.'))
 
     parser.add_argument(
         '--readCategoryRegexNames', nargs='*',
@@ -246,8 +226,9 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--agreementCutoff', type=float, default=0.9,
-        help=('Only reads that agree at least this much will be considered '
-              'connected.'))
+        help=('Only reads with agreeing nucleotides at at least this fraction '
+              'of the significant sites they have in common will be '
+              'considered connected.'))
 
     parser.add_argument(
         '--runSpades', action='store_true', default=False,
@@ -261,12 +242,16 @@ if __name__ == '__main__':
         '--addConsensusToAlignment', action='store_true', default=False,
         help=('If specified, put the consensus sequence into the alignment '
               'for each connected component (only applies if FASTA is '
-              'being written for each component, dut to --fastaDir being '
+              'being written for each component, due to --fastaDir being '
               'specified).'))
 
     args = parser.parse_args()
 
     if args.readCategoryRegexNames:
+        if not args.readCategoryRegex:
+            print('--readCategoryRegex must be specified if '
+                  '--readCategoryRegexNames is used.', file=sys.stderr)
+            sys.exit(1)
         if len(args.readCategoryRegexNames) != len(args.readCategoryRegex):
             print('--readCategoryRegex and --readCategoryRegexNames must be '
                   'of equal length.', file=sys.stderr)
@@ -274,7 +259,7 @@ if __name__ == '__main__':
 
         readCategoryRegexNames = args.readCategoryRegexNames
     else:
-        readCategoryRegexNames = list(args.readCategoryRegex)
+        readCategoryRegexNames = list(args.readCategoryRegex or [])
 
     if args.runSpades and not args.fastaDir:
         print('--fastaDir must be specified if --runSpades is used.',
@@ -282,13 +267,10 @@ if __name__ == '__main__':
         sys.exit(1)
 
     (genome, alignedReads, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset) = parseCommandLineOptions(args)
+     baseCountAtOffset, readsAtOffset,
+     significantOffsets) = parseCommandLineOptions(args, True)
 
     genomeLength = len(genome)
-
-    significantOffsets = list(findSignificantOffsets(
-        baseCountAtOffset, readCountAtOffset, args.minReads,
-        args.homogeneousCutoff))
 
     print('Read %d aligned reads of length %d. '
           'Found %d significant locations.' %
@@ -298,9 +280,9 @@ if __name__ == '__main__':
         print('Exiting due to finding no significant locations.')
         sys.exit(2)
 
-    # agreementOffsets is a dict of dicts, where each value in the nested
-    # dict is a tuple of sets. The first holds offsets that disagree, the
-    # second those that agree. Both dicts are keyed by read id.
+    # agreementOffsets is a dict of dicts, where each value in the nested dict
+    # is a tuple of 2 sets. The first will hold offsets that disagree, the
+    # second those that agree. Both dicts are keyed by read.
     agreementOffsets = defaultdict(
         lambda: defaultdict(
             lambda: (set(), set())
@@ -329,6 +311,8 @@ if __name__ == '__main__':
     graphNodes = set()
     agreementCutoff = args.agreementCutoff
 
+    id1_ = 'K00234:90:HTWVHBBXX:6:2212:17553:32789 (reversed)'
+    id2_ = 'K00234:90:HTWVHBBXX:6:2107:15158:22696 (reversed)'
     # print('# making graph nodes at', ctime(time()), file=sys.stderr)
     for read1 in agreementOffsets:
         node1 = readToNode[read1]
@@ -342,14 +326,18 @@ if __name__ == '__main__':
                 node2 = readToNode[read2]
                 node1.add(node2)
                 node2.add(node1)
+                if ((read1.read.id == id1_ and read2.read.id == id2_) or
+                        (read1.read.id == id2_ and read2.read.id == id1_)):
+                    print('------------------------------ hey there')
+                print('AGREE %d of %d\n  %s\n  %s' % (agreeCount, total, read1, read2))
     # print('# made graph nodes at', ctime(time()), file=sys.stderr)
 
     if args.verbose:
         # Print the agree/disagree offsets and counts for all pairs of
         # reads.
         for read1 in agreementOffsets:
-            print(read1)
             node1 = readToNode[read1]
+            print(read1, 'connected to', len(node1))
             for read2 in agreementOffsets[read1]:
                 node2 = readToNode[read2]
                 print('  %s:\n    agree=%d (%s)\n    disagree=%d (%s)' % (
@@ -377,24 +365,27 @@ if __name__ == '__main__':
 
     components.sort(key=keyfunc)
 
-    if args.fastaDir:
-        # Remove all pre-existing component-XXX.fasta and
-        # component-XXX-aligned.fasta etc., files from the output
-        # directory. This prevents us from doing a run that results in
-        # (say) 6 component files and then doing a run that results in only
-        # 5 and erroneously thinking that component-6.fasta is from the
-        # second run.
-        paths = list(map(str, chain(
-            Path(args.fastaDir).glob('component-[0-9]*.fasta'),
-            Path(args.fastaDir).glob('component-[0-9]*-aligned.fasta'),
-            Path(args.fastaDir).glob('component-[0-9]*-base-frequencies.txt'),
-            Path(args.fastaDir).glob('component-[0-9]*-consensus.fasta'),
-            Path(args.fastaDir).glob('components-alignment.fasta'),
-            Path(args.fastaDir).glob('components-alignment.txt'))))
-        if paths:
-            print('Removing %d pre-existing component .fasta/.txt file%s.' % (
-                len(paths), '' if len(paths) == 1 else 's'))
-            list(map(unlink, paths))
+    fastaDir = args.fastaDir
+    if fastaDir:
+        if exists(fastaDir):
+            # Remove all pre-existing component-XXX.fasta and
+            # component-XXX-aligned.fasta etc., files from the output
+            # directory. This prevents us from doing a run that results in
+            # (say) 6 component files and then doing a run that results in only
+            # 5 and erroneously thinking that component-6.fasta is from the
+            # most recent run.
+            paths = list(map(str, chain(
+                Path(fastaDir).glob('component-[0-9]*.fasta'),
+                Path(fastaDir).glob('component-[0-9]*-base-frequencies.txt'),
+                Path(fastaDir).glob('components-alignment.fasta'),
+                Path(fastaDir).glob('components-alignment.txt'))))
+            if paths:
+                print('Removing %d pre-existing component .fasta/.txt '
+                      'file%s from %s directory.' %
+                      (len(paths), '' if len(paths) == 1 else 's', fastaDir))
+                list(map(unlink, paths))
+        else:
+            mkdir(fastaDir)
 
         componentCountWidth = int(log10(len(components))) + 1
         genomeLengthWidth = int(log10(genomeLength)) + 1
@@ -404,7 +395,7 @@ if __name__ == '__main__':
         for componentIndex, (minOffset, maxOffset, component) in enumerate(
                 components):
             # The plain reads.
-            filename = join(args.fastaDir,
+            filename = join(fastaDir,
                             'component-%0*d.fasta' % (
                                 componentCountWidth, componentIndex + 1))
             with open(filename, 'w') as fp:
@@ -414,7 +405,7 @@ if __name__ == '__main__':
             # The aligned reads (i.e., with gaps in their sequences to
             # align them to the original genome).
             filename = join(
-                args.fastaDir,
+                fastaDir,
                 'component-%0*d-aligned.fasta' % (
                     componentCountWidth, componentIndex + 1))
             with open(filename, 'w') as fp:
@@ -433,7 +424,7 @@ if __name__ == '__main__':
 
             # The base frequencies of component reads.
             filename = join(
-                args.fastaDir,
+                fastaDir,
                 'component-%0*d-base-frequencies.txt' % (
                     componentCountWidth, componentIndex + 1))
             nucleotides = set('ACGT')
@@ -483,7 +474,7 @@ if __name__ == '__main__':
 
             # Write out the component consensus as FASTA.
             filename = join(
-                args.fastaDir,
+                fastaDir,
                 'component-%0*d-consensus.fasta' % (
                     componentCountWidth, componentIndex + 1))
             consensusId = (
@@ -499,7 +490,7 @@ if __name__ == '__main__':
 
         # Write an alignment of the original consensus followed by all
         # component consensus sequences.
-        filename = join(args.fastaDir, 'components-alignment.fasta')
+        filename = join(fastaDir, 'components-alignment.fasta')
         with open(filename, 'w') as fp:
             print(genome.toString('fasta'), end='', file=fp)
             for consensusRead, minOffset in consensuses:
@@ -514,7 +505,7 @@ if __name__ == '__main__':
         # (consensus) genome. That can be used to get a feel for whether
         # the components come from that genome or possibly some other.
         genomeSequence = genome.sequence
-        filename = join(args.fastaDir, 'components-alignment.txt')
+        filename = join(fastaDir, 'components-alignment.txt')
         with open(filename, 'w') as fp:
             for componentIndex, (consensusInfo, componentInfo) in enumerate(
                     zip(consensuses, components)):
@@ -550,7 +541,7 @@ if __name__ == '__main__':
             componentIndex + 1, componentSize,
             '' if componentSize == 1 else 's', minOffset + 1, maxOffset))
         if args.verbose:
-            for read in component:
+            for read in sorted(component):
                 print('  ', read)
 
     # print('# making JSON at', ctime(time()), file=sys.stderr)
@@ -574,21 +565,20 @@ if __name__ == '__main__':
         sum([len(component[-1]) for component in components]),
         len(components), agreementCutoff))
 
-    if args.show:
-        if args.additionalLocations:
-            # These are 1-based.
-            fields = args.additionalLocations.split()
-            additionalOffsetsTitle = fields.pop(0).replace('_', ' ')
-            additionalOffsets = list(
-                map(lambda location: int(location) - 1, fields))
-            assert all(offset >= 0 for offset in additionalOffsets)
-        else:
-            additionalOffsets = additionalOffsetsTitle = None
+    if args.additionalLocations:
+        # These are 1-based.
+        fields = args.additionalLocations.split()
+        additionalOffsetsTitle = fields.pop(0).replace('_', ' ')
+        additionalOffsets = list(
+            map(lambda location: int(location) - 1, fields))
+        assert all(offset >= 0 for offset in additionalOffsets)
+    else:
+        additionalOffsets = additionalOffsetsTitle = None
 
-        title = (
-            'Connected component composition<br>%d significant locations'
-            % len(significantOffsets))
-        plotComponents(
-            components, args.readCategoryRegex, readCategoryRegexNames,
-            genomeLength, significantOffsets, 'connected-components.html',
-            title, additionalOffsets, additionalOffsetsTitle)
+    title = (
+        'Connected component composition<br>%d significant locations'
+        % len(significantOffsets))
+    plotComponents(
+        components, args.readCategoryRegex, readCategoryRegexNames,
+        genomeLength, significantOffsets, 'connected-components.html',
+        title, additionalOffsets, additionalOffsetsTitle, args.show)
