@@ -7,18 +7,12 @@ import plotly
 import plotly.graph_objs as go
 import re
 import colorlover
-from collections import Counter
-from pathlib import Path  # This is Python 3 only.
-from os.path import join, exists
 from math import log10
-from os import unlink, mkdir
-from itertools import chain
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from data.data import addCommandLineOptions, parseCommandLineOptions
 from dark.dna import AMBIGUOUS
-from data.graph import Node, connectedComponents, componentOffsets
-from dark.reads import Read
+from dark.fasta import FastaReads
 
 # Make a reverse version of AMBIGUOUS.
 BASES_TO_AMBIGUOUS = {}
@@ -26,9 +20,122 @@ for symbol, bases in AMBIGUOUS.items():
     BASES_TO_AMBIGUOUS[''.join(sorted(bases))] = symbol
 
 
+def connectedComponentsByOffset(significantReads):
+    """
+    Yield sets of reads that are connected according to what significant
+    offsets they cover (the nucleotides at those offsets are irrelevant).
+
+    @param significantReads: A C{set} of C{AlignedRead} instances, all of
+        which cover at least one significant offset.
+    """
+    while significantReads:
+        element = significantReads.pop()
+        component = {element}
+        offsets = set(element.significantOffsets)
+        addedSomething = True
+        while addedSomething:
+            addedSomething = False
+            these = set()
+            for read in significantReads:
+                if offsets.intersection(read.significantOffsets):
+                    addedSomething = True
+                    these.add(read)
+                    offsets.update(read.significantOffsets)
+            if these:
+                significantReads.difference_update(these)
+                component.update(these)
+        yield component, offsets
+
+
+def consistentReadSets(component, threshold):
+    """
+    Yield sets of reads that are consistent according to what nucleotides they
+    have at their significant offsets.
+
+    @param component: A C{set} of C{AlignedRead} instances.
+    @param threshold: A C{float} indicating what fraction of read's nucleotides
+        must be identical (to those already in the component) for it to be
+        allowed to join a growing component.
+    """
+    def key(read):
+        """
+        We'll sort the avaialable reads by the number of significant offsets
+        they have, then by start offset in the genome.
+        """
+        return (len(read.significantOffsets), read.offset)
+
+    while component:
+        reads = sorted(component, key=key, reverse=True)
+        read0 = reads[0]
+        these = {read0}
+        nucleotides = defaultdict(Counter)
+        for offset in read0.significantOffsets:
+            nucleotides[offset][read0.base(offset)] += 1
+        rejected = set()
+
+        # Add all the reads that agree exactly at all the offsets in the
+        # set so far.
+        for read in reads[1:]:
+            nucleotidesIfAccepted = []
+            for offset in read.significantOffsets:
+                base = read.base(offset)
+                if offset in nucleotides:
+                    if base not in nucleotides[offset]:
+                        # Not an exact match. Reject this read for now.
+                        rejected.add(read)
+                        break
+                nucleotidesIfAccepted.append((offset, base))
+            else:
+                # We didn't break, so add this read.
+                for offset, base in nucleotidesIfAccepted:
+                    nucleotides[offset][base] += 1
+                component.remove(read)
+                these.add(read)
+
+        # Add in the first-round rejects that have a high enough threshold.
+        # We do this before we add the bases of the rejects to nucleotides
+        # because we don't want to pollute nucleotides with a bunch of
+        # bases from first-round rejects (because their bases could
+        # overwhelm the bases of the first round acceptees).
+        acceptedRejects = set()
+        for read in rejected:
+            total = matching = 0
+            for offset in read.significantOffsets:
+                base = read.base(offset)
+                if offset in nucleotides:
+                    total += 1
+                    if base in nucleotides[offset]:
+                        matching += 1
+            if total and matching / total >= threshold:
+                # Looks good!
+                acceptedRejects.add(read)
+                component.remove(read)
+                these.add(read)
+
+        # Add the nucleotides of the second-round acceptances.
+        for accepted in acceptedRejects:
+            for offset in accepted.significantOffsets:
+                nucleotides[offset][accepted.base(offset)] += 1
+
+        component.difference_update(these)
+        yield these, nucleotides
+
+
+def nucleotidesToStr(nucleotides):
+    """
+    @param nucleotides: A C{defaultdict(Counter)} instance, keyed
+        by offset, with nucleotides keying the Counters.
+    """
+    result = []
+    for offset in sorted(nucleotides):
+        result.append(
+            '%d: %s' % (offset, baseCountsToStr(nucleotides[offset])))
+    return ', '.join(result)
+
+
 def baseCountsToStr(counts):
     """
-    @param counts: A C{counter} instance.
+    @param counts: A C{Counter} instance.
     """
     return ' '.join([
         ('%s:%d' % (base, counts[base])) for base in sorted(counts)])
@@ -98,7 +205,7 @@ def plotComponents(components, categoryRegexs, categoryNames, genomeLength,
         categoryCounts = [0] * (nCategories + 1)
 
         for node in component:
-            id_ = node.read.read.id
+            id_ = node.read.id
             for i, regex in enumerate(compiledCategoryRegexs):
                 if regex.match(id_):
                     categoryCounts[i] += 1
@@ -183,15 +290,14 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description='Find which reads agree and disagree with one another.')
 
-    addCommandLineOptions(parser, 'connected-components.html')
-
     parser.add_argument(
         '--verbose', action='store_true', default=False,
         help='Print verbose textual output showing read connections.')
 
     parser.add_argument(
-        '--componentJSON',
-        help='The filename to write JSON containing all components to.')
+        '--reducedFilename',
+        help=('The filename to write reduced (significant location only) '
+              'reads to.'))
 
     parser.add_argument(
         '--fastaDir',
@@ -225,7 +331,7 @@ if __name__ == '__main__':
               '--readCategoryRegex.'))
 
     parser.add_argument(
-        '--agreementCutoff', type=float, default=0.9,
+        '--agreementThreshold', type=float, default=0.9,
         help=('Only reads with agreeing nucleotides at at least this fraction '
               'of the significant sites they have in common will be '
               'considered connected.'))
@@ -245,6 +351,7 @@ if __name__ == '__main__':
               'being written for each component, due to --fastaDir being '
               'specified).'))
 
+    addCommandLineOptions(parser)
     args = parser.parse_args()
 
     if args.readCategoryRegexNames:
@@ -280,290 +387,62 @@ if __name__ == '__main__':
         print('Exiting due to finding no significant locations.')
         sys.exit(2)
 
-    # agreementOffsets is a dict of dicts, where each value in the nested dict
-    # is a tuple of 2 sets. The first will hold offsets that disagree, the
-    # second those that agree. Both dicts are keyed by read.
-    agreementOffsets = defaultdict(
-        lambda: defaultdict(
-            lambda: (set(), set())
-            )
-        )
+    if args.reducedFilename:
+        allGaps = '-' * len(significantOffsets)
+        def unwanted(read):
+            return (None if read.sequence == allGaps else read)
+        FastaReads(args.fastaFile).filter(
+            keepSites=significantOffsets).filter(
+                modifier=unwanted).save(args.reducedFilename)
 
-    DISAGREE, AGREE = (0, 1)
+    significantReads = set(read for read in alignedReads
+                           if read.significantOffsets)
 
-    # print('# counting agree/disagree at', ctime(time()), file=sys.stderr)
-    for offset in significantOffsets:
-        reads = readsAtOffset[offset]
-        for read1 in reads:
-            base1 = read1.base(offset)
-            # assert base1
-            for read2 in reads:
-                if read2 is not read1:
-                    base2 = read2.base(offset)
-                    # assert base2
-                    # The following line assumes AGREE is 1 & DISAGREE is 0.
-                    agreement = int(base1 == base2)
-                    agreementOffsets[read1][read2][agreement].add(offset)
-                    agreementOffsets[read2][read1][agreement].add(offset)
-    # print('# counted  agree/disagree at', ctime(time()), file=sys.stderr)
+    componentCounts = []
+    componentOffsets = []
+    for i, (component, offsets) in enumerate(
+            connectedComponentsByOffset(significantReads)):
+        componentLength = len(component)
+        print('component %d (%d reads)' % (i, componentLength))
+        print('  offsets', sorted(offsets))
+        for read in sorted(component):
+            print('  ', read)
 
-    readToNode = dict((read, Node(read)) for read in agreementOffsets)
-    graphNodes = set()
-    agreementCutoff = args.agreementCutoff
+        subComponentCounts = []
+        for j, (consistentReads, nucleotides) in enumerate(
+                consistentReadSets(component, args.agreementThreshold)):
+            subComponentCounts.append(len(consistentReads))
+            print('    Consistent sub-graph %d (%d reads)' %
+                  (j, len(consistentReads)))
+            print('      nucleotides', nucleotidesToStr(nucleotides))
+            for read in sorted(consistentReads):
+                print('      ', read)
 
-    id1_ = 'K00234:90:HTWVHBBXX:6:2212:17553:32789 (reversed)'
-    id2_ = 'K00234:90:HTWVHBBXX:6:2107:15158:22696 (reversed)'
-    # print('# making graph nodes at', ctime(time()), file=sys.stderr)
-    for read1 in agreementOffsets:
-        node1 = readToNode[read1]
-        graphNodes.add(node1)
-        for read2 in agreementOffsets[read1]:
-            agreeCount = len(agreementOffsets[read1][read2][AGREE])
-            disagreeCount = len(agreementOffsets[read1][read2][DISAGREE])
-            total = agreeCount + disagreeCount
-            assert total > 0
-            if agreeCount / total >= agreementCutoff:
-                node2 = readToNode[read2]
-                node1.add(node2)
-                node2.add(node1)
-                if ((read1.read.id == id1_ and read2.read.id == id2_) or
-                        (read1.read.id == id2_ and read2.read.id == id1_)):
-                    print('------------------------------ hey there')
-                print('AGREE %d of %d\n  %s\n  %s' % (agreeCount, total, read1, read2))
-    # print('# made graph nodes at', ctime(time()), file=sys.stderr)
+        assert componentLength == sum(subComponentCounts)
+        subComponentCounts = sorted(subComponentCounts, reverse=True)
+        print('  sub-component lengths', subComponentCounts)
+        componentCounts.append(subComponentCounts)
+        componentOffsets.append((min(offsets), max(offsets)))
 
-    if args.verbose:
-        # Print the agree/disagree offsets and counts for all pairs of
-        # reads.
-        for read1 in agreementOffsets:
-            node1 = readToNode[read1]
-            print(read1, 'connected to', len(node1))
-            for read2 in agreementOffsets[read1]:
-                node2 = readToNode[read2]
-                print('  %s:\n    agree=%d (%s)\n    disagree=%d (%s)' % (
-                    read2,
-                    len(agreementOffsets[read1][read2][AGREE]),
-                    sorted(agreementOffsets[read1][read2][AGREE]),
-                    len(agreementOffsets[read1][read2][DISAGREE]),
-                    sorted(agreementOffsets[read1][read2][DISAGREE])))
-                if node2 in node1:
-                    print('    Connected')
-
-    # print('# computing ccs at', ctime(time()), file=sys.stderr)
-    components = []
-    for component in connectedComponents(graphNodes):
-        offsets = componentOffsets(component)
-        components.append((min(offsets), max(offsets), component))
-    # print('# computed  ccs at', ctime(time()), file=sys.stderr)
-
-    # Sort the components.
-    def keyfunc(item):
-        """
-        Sort first on min offset then on component size.
-        """
-        return item[0], len(item[2])
-
-    components.sort(key=keyfunc)
-
-    fastaDir = args.fastaDir
-    if fastaDir:
-        if exists(fastaDir):
-            # Remove all pre-existing component-XXX.fasta and
-            # component-XXX-aligned.fasta etc., files from the output
-            # directory. This prevents us from doing a run that results in
-            # (say) 6 component files and then doing a run that results in only
-            # 5 and erroneously thinking that component-6.fasta is from the
-            # most recent run.
-            paths = list(map(str, chain(
-                Path(fastaDir).glob('component-[0-9]*.fasta'),
-                Path(fastaDir).glob('component-[0-9]*-base-frequencies.txt'),
-                Path(fastaDir).glob('components-alignment.fasta'),
-                Path(fastaDir).glob('components-alignment.txt'))))
-            if paths:
-                print('Removing %d pre-existing component .fasta/.txt '
-                      'file%s from %s directory.' %
-                      (len(paths), '' if len(paths) == 1 else 's', fastaDir))
-                list(map(unlink, paths))
+    # Print a final component and sub-component count summary.
+    print('\nFinal length summary of %d components' % len(componentCounts))
+    totalReads = 0
+    for i, (subComponentCounts, subComponentOffsets) in enumerate(
+            zip(componentCounts, componentOffsets)):
+        componentCount = sum(subComponentCounts)
+        totalReads += componentCount
+        print('component %d (%d reads) from %d to %d: %r' % (
+            i, componentCount, subComponentOffsets[0], subComponentOffsets[1],
+            subComponentCounts), end='')
+        if len(subComponentCounts) > 1:
+            print(' ratio %.2f' %
+                  (subComponentCounts[0] / subComponentCounts[1]))
         else:
-            mkdir(fastaDir)
+            print()
 
-        componentCountWidth = int(log10(len(components))) + 1
-        genomeLengthWidth = int(log10(genomeLength)) + 1
-        readCountWidth = int(log10(len(alignedReads))) + 1
-        consensuses = []
+    print('%d reads (of %d) put into %d components.' % (
+        totalReads, len(alignedReads), len(componentCounts)))
 
-        for componentIndex, (minOffset, maxOffset, component) in enumerate(
-                components):
-            # The plain reads.
-            filename = join(fastaDir,
-                            'component-%0*d.fasta' % (
-                                componentCountWidth, componentIndex + 1))
-            with open(filename, 'w') as fp:
-                for node in component:
-                    print(node.read.read.toString('fasta'), end='', file=fp)
-
-            # The aligned reads (i.e., with gaps in their sequences to
-            # align them to the original genome).
-            filename = join(
-                fastaDir,
-                'component-%0*d-aligned.fasta' % (
-                    componentCountWidth, componentIndex + 1))
-            with open(filename, 'w') as fp:
-                if args.addConsensusToAlignment:
-                    # Write the full consensus genome.
-                    print(genome.toString('fasta'), end='', file=fp)
-                for node in component:
-                    preGaps = '-' * node.read.offset
-                    postGaps = '-' * (
-                        genomeLength - node.read.offset - len(node.read.read))
-                    newRead = Read(
-                        node.read.read.id,
-                        preGaps + node.read.read.sequence + postGaps)
-                    assert len(newRead) == genomeLength
-                    print(newRead.toString('fasta'), end='', file=fp)
-
-            # The base frequencies of component reads.
-            filename = join(
-                fastaDir,
-                'component-%0*d-base-frequencies.txt' % (
-                    componentCountWidth, componentIndex + 1))
-            nucleotides = set('ACGT')
-            consensus = []
-            with open(filename, 'w') as fp:
-                for offset in range(minOffset, maxOffset):
-                    counts = Counter()
-                    for node in component:
-                        base = node.read.base(offset)
-                        if base in nucleotides:
-                            counts[base] += 1
-                    print('Location %*d: base counts %s' % (
-                        genomeLengthWidth, offset + 1,
-                        baseCountsToStr(counts)), file=fp)
-                    total = sum(counts.values())
-
-                    # Figure out the most frequent bases.
-                    maxCount = -1
-                    bases = []
-                    for base, baseCount in counts.items():
-                        if baseCount > maxCount:
-                            maxCount = baseCount
-                            bases = [base]
-                        elif baseCount == maxCount:
-                            bases.append(base)
-                    bases = ''.join(sorted(bases))
-                    try:
-                        consensus.append(BASES_TO_AMBIGUOUS[bases])
-                    except KeyError:
-                        if bases:
-                            print(
-                                'For component %d we have no ambiguous '
-                                'nucleotide symbol for bases %r. Location %d '
-                                '(min/max = %d/%d)' %
-                                (componentIndex + 1, bases, offset + 1,
-                                 minOffset + 1, maxOffset + 1),
-                                file=sys.stderr)
-                            # Put something into the consensus to serve as
-                            # an alert.
-                            consensus.append('[%s]' % (bases,))
-                        else:
-                            # No bases were found at this offset. This can
-                            # happen if all reads in the component (and
-                            # there may only be one) have (e.g.) an 'N' at
-                            # this location.
-                            consensus.append('N')
-
-            # Write out the component consensus as FASTA.
-            filename = join(
-                fastaDir,
-                'component-%0*d-consensus.fasta' % (
-                    componentCountWidth, componentIndex + 1))
-            consensusId = (
-                'component-%0*d-consensus,reads=%d,locations=%d:%d,length=%d' %
-                (componentCountWidth, componentIndex + 1, len(component),
-                 minOffset + 1, maxOffset, maxOffset - minOffset))
-
-            read = Read(consensusId, ''.join(consensus))
-            with open(filename, 'w') as fp:
-                print(read.toString('fasta'), end='', file=fp)
-
-            consensuses.append((read, minOffset))
-
-        # Write an alignment of the original consensus followed by all
-        # component consensus sequences.
-        filename = join(fastaDir, 'components-alignment.fasta')
-        with open(filename, 'w') as fp:
-            print(genome.toString('fasta'), end='', file=fp)
-            for consensusRead, minOffset in consensuses:
-                read = Read(
-                    consensusRead.id,
-                    ('-' * minOffset +
-                     consensusRead.sequence +
-                     '-' * (genomeLength - minOffset - len(consensusRead))))
-                print(read.toString('fasta'), end='', file=fp)
-
-        # See how well each component consensus fits with the original
-        # (consensus) genome. That can be used to get a feel for whether
-        # the components come from that genome or possibly some other.
-        genomeSequence = genome.sequence
-        filename = join(fastaDir, 'components-alignment.txt')
-        with open(filename, 'w') as fp:
-            for componentIndex, (consensusInfo, componentInfo) in enumerate(
-                    zip(consensuses, components)):
-                (consensus, minOffset) = consensusInfo
-                consensusSequence = consensus.sequence
-                (minOffset_, maxOffset, component) = componentInfo
-                # Sanity check.
-                assert minOffset == minOffset_
-
-                agreeCount = 0
-                for index in range(len(consensusSequence)):
-                    if consensusSequence[index] in AMBIGUOUS[
-                            genomeSequence[index + minOffset]]:
-                        agreeCount += 1
-                print('Component %*d (read count %*d, locations %*d-%*d, '
-                      'length %*d): %*d of %*d (%.2f%%) bases match' %
-                      (componentCountWidth, componentIndex + 1,
-                       readCountWidth,
-                       len(component),
-                       genomeLengthWidth, minOffset + 1,
-                       genomeLengthWidth, maxOffset,
-                       genomeLengthWidth, maxOffset - minOffset,
-                       genomeLengthWidth, agreeCount,
-                       genomeLengthWidth, len(consensusSequence),
-                       agreeCount / len(consensusSequence) * 100.0),
-                      file=fp)
-
-    # Write a textual summary of the components.
-    for componentIndex, (minOffset, maxOffset, component) in enumerate(
-            components):
-        componentSize = len(component)
-        print('Component %d (%d read%s) locations: %d-%d' % (
-            componentIndex + 1, componentSize,
-            '' if componentSize == 1 else 's', minOffset + 1, maxOffset))
-        if args.verbose:
-            for read in sorted(component):
-                print('  ', read)
-
-    # print('# making JSON at', ctime(time()), file=sys.stderr)
-    if args.componentJSON:
-        from json import dump
-        result = []
-        with open(args.componentJSON, 'w') as fp:
-            for (minOffset, maxOffset, component) in components:
-                componentReads = []
-                for node in component:
-                    alignedRead = node.read
-                    componentReads.append(
-                        (alignedRead.read.id, alignedRead.read.sequence,
-                         alignedRead.offset))
-                result.append(componentReads)
-            dump(result, fp)
-        del result
-    # print('# made   JSON at', ctime(time()), file=sys.stderr)
-
-    print('Found %d nodes in %d components. Agreement cutoff %.3f.' % (
-        sum([len(component[-1]) for component in components]),
-        len(components), agreementCutoff))
 
     if args.additionalLocations:
         # These are 1-based.
@@ -578,7 +457,8 @@ if __name__ == '__main__':
     title = (
         'Connected component composition<br>%d significant locations'
         % len(significantOffsets))
-    plotComponents(
-        components, args.readCategoryRegex, readCategoryRegexNames,
-        genomeLength, significantOffsets, 'connected-components.html',
-        title, additionalOffsets, additionalOffsetsTitle, args.show)
+
+    # plotComponents(
+    #     components, args.readCategoryRegex, readCategoryRegexNames,
+    #     genomeLength, significantOffsets, 'connected-components.html',
+    #     title, additionalOffsets, additionalOffsetsTitle, args.show)

@@ -1,22 +1,21 @@
-from collections import Counter
+from __future__ import division
 
-from dark.reads import (
-    addFASTACommandLineOptions, parseFASTACommandLineOptions)
+from collections import Counter, OrderedDict
+
 from dark.fasta import FastaReads
+from dark.reads import Read
 
 
-class AlignedRead(object):
+class AlignedRead(Read):
     """
     Hold information about a read that has been aligned to a consensus.
 
     @param read: A C{dark.reads.Read} instance.
     """
-    def __init__(self, read):
-        sequence = read.sequence.upper()
-        # self.significantOffsets is monkey patched :-(
-        self.significantOffsets = None
+    def __init__(self, id_, sequence):
+        self.significantOffsets = OrderedDict()
 
-        # Scan for initial gaps.
+        # Scan the sequence for initial gaps.
         offset = 0
         for base in sequence:
             if base == '-':
@@ -24,7 +23,7 @@ class AlignedRead(object):
             else:
                 break
 
-        if offset == len(read):
+        if offset == len(sequence):
             raise ValueError('Read is all gaps.')
 
         # Scan for final gaps.
@@ -37,35 +36,69 @@ class AlignedRead(object):
 
         # Make sure the read is not all gaps.
         assert offset + trailing < len(sequence)
-
-        read.sequence = sequence[offset:len(sequence) - trailing]
-        self.read = read
         self.offset = offset
 
+        Read.__init__(
+            self, id_, sequence[offset:len(sequence) - trailing].upper())
+
+
     def __str__(self):
-        if self.significantOffsets is not None:
-            bases = []
-            offsets = []
-            for offset in self.significantOffsets:
-                base = self.base(offset)
-                if base is None:
-                    if bases:
-                        # We hit a non-covered offset after some offsets were
-                        # already covered (because bases is not empty), so we
-                        # can break because we've gone beyond the end of the
-                        # read. (This assumes the significant offsets are
-                        # sorted increasingly, which they are.)
-                        break
-                else:
-                    bases.append(base)
-                    offsets.append(offset)
+        if self.significantOffsets:
             bases = ', bases %s, offsets %s' % (
-                ''.join(bases), ','.join(map(str, offsets)))
+                ''.join(self.significantOffsets.values()),
+                ','.join(map(str, self.significantOffsets)))
         else:
             bases = ''
 
         return '<AlignedRead: (offset %4d, len %2d%s) %s>' % (
-            self.offset, len(self.read), bases, self.read.id)
+            self.offset, len(self), bases, self.id)
+
+    def __lt__(self, other):
+        t1 = (self.offset, len(self.significantOffsets))
+        t2 = (other.offset, len(other.significantOffsets))
+        if t1 == t2:
+            return Read.__lt__(self, other)
+        else:
+            return t1 < t2
+
+    def agreesWith(self, other, agreementFraction):
+        """
+        Two reads agree if they have identical bases in a sufficiently high
+        fraction of their shared significant offsets.
+
+        @param other: Another C{AlignedRead} instance.
+        @param agreementFraction: A [0..1] C{float} fraction. Agreement is true
+            if the fraction of identical bases is at least this high.
+        @return: C{True} if the reads agree, C{False} if not.
+        """
+        sharedCount = identicalCount = 0
+        getOtherBase = other.significantOffsets.get
+        for offset, base in self.significantOffsets.items():
+            otherBase = getOtherBase(offset)
+            if otherBase:
+                sharedCount += 1
+                identicalCount += (otherBase == base)
+        if sharedCount:
+            return (identicalCount / sharedCount) >= agreementFraction
+        else:
+            return True
+
+    def setSignificantOffsets(self, significantOffsets):
+        """
+        Find the base at each of the significant offsets covered by this read.
+
+        @param significantOffsets: A C{list} of C{int} offsets.
+        """
+        newSignificantOffsets = OrderedDict()
+        for offset in significantOffsets:
+            base = self.base(offset)
+            if base is not None:
+                # Note that we cannot break out of this loop early if base
+                # is None because some reads have embedded gaps ('-'), for
+                # which self.base returns None. So we have to continue on
+                # to higher offsets.
+                newSignificantOffsets[offset] = base
+        self.significantOffsets = newSignificantOffsets
 
     def base(self, n):
         """
@@ -76,8 +109,9 @@ class AlignedRead(object):
             the genome at that offset.
         """
         offset = self.offset
-        if n >= offset and n < offset + len(self.read):
-            return self.read.sequence[n - offset]
+        if n >= offset and n < offset + len(self):
+            b = self.sequence[n - offset]
+            return None if b == '-' else b
 
     def trim(self, n):
         """
@@ -88,8 +122,8 @@ class AlignedRead(object):
             not (due to the read being too short).
         """
         assert n >= 0, ('Trim amount (%d) cannot be negative.' % n)
-        if 2 * n < len(self.read):
-            self.read = self.read[n:len(self.read) - n]
+        if 2 * n < len(self):
+            self.sequence = self.sequence[n:len(self) - n]
             self.offset += n
             return True
         else:
@@ -160,7 +194,9 @@ def addCommandLineOptions(parser, outfileDefaultName=None):
     @param outfileDefaultName: The C{str} output file to use as a default
         in case the user does not give one on the command line.
     """
-    addFASTACommandLineOptions(parser)
+    parser.add_argument(
+        '--fastaFile', metavar='FILENAME', required=True,
+        help='The name of the FASTA input file.')
 
     parser.add_argument(
         '--genomeFile',
@@ -217,7 +253,7 @@ def parseCommandLineOptions(args, findSigOffsets):
         genome = genomeReads[0]
         genomeLength = len(genome)
 
-    reads = parseFASTACommandLineOptions(args)
+    reads = FastaReads(args.fastaFile)
     alignedReads = []
     trim = args.trim
     for count, read in enumerate(reads, start=1):
@@ -231,7 +267,7 @@ def parseCommandLineOptions(args, findSigOffsets):
                 'instead of %d)' %
                 (count, read.id, args.fastaFile, len(read), genomeLength))
             try:
-                ar = AlignedRead(read)
+                ar = AlignedRead(read.id, read.sequence)
             except ValueError as e:
                 # Ignore reads that are all gaps.
                 assert str(e) == 'Read is all gaps.'
@@ -250,7 +286,7 @@ def parseCommandLineOptions(args, findSigOffsets):
             baseCountAtOffset, readCountAtOffset, args.minReads,
             args.homogeneousCutoff))
         for read in alignedReads:
-            read.significantOffsets = significantOffsets
+            read.setSignificantOffsets(significantOffsets)
     else:
         significantOffsets = None
 
