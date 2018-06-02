@@ -128,13 +128,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    (genome, alignedReads, readCountAtOffset,
+    (genomeLength, alignedReads, readCountAtOffset,
      baseCountAtOffset, readsAtOffset,
      significantOffsets) = parseCommandLineOptions(args, True)
 
     print('Read %d aligned reads of length %d. '
           'Found %d significant offsets.' %
-          (len(alignedReads), len(genome), len(significantOffsets)))
+          (len(alignedReads), genomeLength, len(significantOffsets)))
 
     title = args.title or (
         'Consistency heatmap at %d significant offsets.<br>ARI above '

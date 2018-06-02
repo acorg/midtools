@@ -34,12 +34,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    (genome, alignedReads, readCountAtLocation, baseCountAtLocation,
+    (genomeLength, alignedReads, readCountAtLocation, baseCountAtLocation,
      readsAtLocation, _) = parseCommandLineOptions(args, False)
 
     print('Read %d aligned reads.' % len(alignedReads), file=sys.stderr)
 
-    genomeLength = len(genome)
     genomeLengthWidth = int(log10(genomeLength)) + 1
     nucleotides = set('ACGT')
 

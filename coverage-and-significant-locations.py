@@ -56,7 +56,7 @@ if __name__ == '__main__':
     addCommandLineOptions(parser, 'coverage-and-significant-locations.html')
     args = parser.parse_args()
 
-    (genome, alignedReads, readCountAtOffset,
+    (genomeLength, alignedReads, readCountAtOffset,
      baseCountAtOffset, readsAtOffset,
      significantOffsets) = parseCommandLineOptions(args, True)
 
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     fig = tools.make_subplots(rows=2, cols=1,
                               subplot_titles=('a', 'b'))
 
-    plotCoverage(fig, 1, 1, readCountAtOffset, len(genome))
+    plotCoverage(fig, 1, 1, readCountAtOffset, genomeLength)
 
     plotSignificantOffsets(fig, 2, 1, significantOffsets)
 

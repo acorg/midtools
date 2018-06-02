@@ -259,11 +259,9 @@ if __name__ == '__main__':
               file=sys.stderr)
         sys.exit(1)
 
-    (genome, alignedReads, readCountAtOffset,
+    (genomeLen, alignedReads, readCountAtOffset,
      baseCountAtOffset, readsAtOffset,
      significantOffsets) = parseCommandLineOptions(args, True)
-
-    genomeLength = len(genome)
 
     print('Read %d aligned reads of length %d. '
           'Found %d significant locations.' %

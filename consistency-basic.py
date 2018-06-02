@@ -82,11 +82,9 @@ if __name__ == '__main__':
     addCommandLineOptions(parser, 'consistency-basic.html')
     args = parser.parse_args()
 
-    (genome, alignedReads, readCountAtOffset,
+    (genomeLength, alignedReads, readCountAtOffset,
      baseCountAtOffset, readsAtOffset,
      significantOffsets) = parseCommandLineOptions(args, True)
-
-    genomeLength = len(genome)
 
     print('Read %d aligned reads. Found %d significant locations.' %
           (len(alignedReads), len(significantOffsets)))
