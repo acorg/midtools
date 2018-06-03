@@ -25,3 +25,28 @@ def nucleotidesToStr(nucleotides, prefix=''):
             '%s%d: %s' % (prefix, offset,
                           baseCountsToStr(nucleotides[offset])))
     return '\n'.join(result)
+
+
+def commonest(counts, drawFp=None, drawMessage=None):
+    """
+    Return the key of the Counter instance that is the most common.
+
+    @param counts: A C{Counter} instance.
+    @param drawFp: A file pointer to write information about draws (if any) to.
+    @param drawMessage: A C{str} message to write to C{drawFp}. If the string
+        contains '%(baseCounts)s' that will be replaced by a string
+        representation of the base counts (in C{counts}) obtained from
+        C{baseCountsToStr}. If not, the base count info will be printed after
+        the message.
+    """
+    c = counts.most_common()
+
+    # Detect draws & print a message if we find one.
+    if len(c) > 1 and c[0][1] == c[1][1] and drawFp and drawMessage:
+        bases = baseCountsToStr(counts)
+        if drawMessage.find('%(baseCounts)s') > -1:
+            print(drawMessage % {'baseCounts': bases}, file=drawFp)
+        else:
+            print('%s\n%s' % (drawMessage, bases), file=drawFp)
+
+    return c[0][0]

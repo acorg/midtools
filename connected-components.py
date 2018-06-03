@@ -51,6 +51,11 @@ if __name__ == '__main__':
         help='The name of the FASTA input file.')
 
     parser.add_argument(
+        '--referenceGenome', metavar='FILENAME', action='append',
+        help=('The name of a FASTA file containing reference genomes (may '
+              'be repeated).'))
+
+    parser.add_argument(
         '--minReads', type=int, default=5,
         help=('The minimum number of reads that must cover a location for it '
               'to be considered significant.'))
@@ -61,6 +66,11 @@ if __name__ == '__main__':
               'this fraction of the time (i.e., amongst all reads that cover '
               'the location) then the locaion will be considered homogeneous '
               'and therefore uninteresting.'))
+
+    parser.add_argument(
+        '--trim', type=int, default=0,
+        help=('The number of bases to trim from the start and end of each '
+              'read (to try to remove possible damage).'))
 
     args = parser.parse_args()
     verbose = args.verbose
@@ -89,17 +99,30 @@ if __name__ == '__main__':
     ra = ReadAnalysis(
         args.fastaFile, outputDir, genomeLength, alignedReads,
         readCountAtOffset, baseCountAtOffset, readsAtOffset,
-        significantOffsets, args.agreementThreshold)
+        significantOffsets, args.agreementThreshold, verbose,
+        args.referenceGenome)
 
     if verbose:
-        print('Saving significant offsets', file=sys.stderr)
+        print('Saving significant offsets')
     ra.saveSignificantOffsets()
+
+    if verbose:
+        print('Saving component FASTA')
+    ra.saveComponentFasta()
 
     if args.saveReducedFASTA:
         if verbose:
-            print('Saving reduced FASTA', file=sys.stderr)
+            print('Saving reduced FASTA')
         ra.saveReducedFasta()
 
     if verbose:
-        print('Writing analysis summary', file=sys.stderr)
+        print('Writing analysis summary')
     ra.summarize()
+
+    if verbose:
+        print('Saving component consensuses')
+    ra.saveComponentConsensuses()
+
+    if verbose:
+        print('Saving closest consensuses to references')
+    ra.saveClosestReferenceConsensuses()

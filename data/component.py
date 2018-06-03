@@ -1,7 +1,9 @@
 from os.path import join
 from collections import defaultdict, Counter
 
-from data.utils import nucleotidesToStr
+from dark.reads import Read
+
+from data.utils import nucleotidesToStr, commonest
 
 
 def connectedComponentsByOffset(significantReads, threshold):
@@ -49,19 +51,68 @@ class ConsistentComponent(object):
         return len(self.reads)
 
     def saveFasta(self, fp):
+        """
+        Save all reads as FASTA.
+
+        @param fp: A file pointer to write to.
+        """
         for read in sorted(self.reads):
             print(read.toString(), end='', file=fp)
 
-    def summarize(self, fp, count):
+    def consensusSequence(self, componentOffsets, infoFp):
+        """
+        Get a consensus sequence.
+
+        @param componentOffsets: The C{set} of offsets in this component. This
+            is *not* the same as the offsets in this consistent component
+            because this consistent component may not have reads for all
+            offsets.
+        @param infoFp: A file pointer to write draw (and other) info to.
+        @return: A C{str} consensus sequence.
+        """
+        sequence = []
+        for offset in sorted(componentOffsets):
+            if offset in self.nucleotides:
+                base = commonest(
+                    self.nucleotides[offset], infoFp,
+                    'WARNING: consensus draw at offset %d' % offset +
+                    ' %(baseCounts)s.')
+            else:
+                base = '-'
+            sequence.append(base)
+        return ''.join(sequence)
+
+    def saveConsensus(self, count, componentOffsets, consensusFp, infoFp):
+        """
+        Save a consensus as FASTA.
+
+        @param count: The C{int} number of this consistent component within
+            its overall connected component.
+        @param componentOffsets: The C{set} of offsets in this component. This
+            is *not* the same as the offsets in this consistent component
+            because this consistent component may not have reads for all
+            offsets.
+        @param consensusFp: A file pointer to write the consensus to.
+        @param drawFp: A file pointer to write draw (and other) info to.
+        """
+        print(
+            Read('consistent-component-%d-consensus (based on %d reads)' %
+                 (count, len(self.reads)),
+                 self.consensusSequence(componentOffsets, infoFp)
+            ).toString('fasta'), file=consensusFp, end='')
+
+    def summarize(self, fp, count, componentOffsets):
         plural = '' if len(self.reads) == 1 else 's'
-        print('    Consistent component %d, %d read%s, covering %d offset%s)' %
+        print('    Consistent component %d: %d read%s, covering %d offset%s' %
               (count, len(self.reads), plural, len(self.nucleotides),
                '' if len(self.nucleotides) == 1 else 's'), file=fp)
-        print('    Nucleotides for each offset:', file=fp)
+        print('    Nucleotide counts for each offset:', file=fp)
         print(nucleotidesToStr(self.nucleotides, '      '), file=fp)
+        print('    Consensus sequence: %s' %
+              self.consensusSequence(componentOffsets, fp), file=fp)
         print('    Read%s:' % plural, file=fp)
         for read in sorted(self.reads):
-            print(read, file=fp)
+            print('     ', read, file=fp)
 
 
 class ComponentByOffsets(object):
@@ -87,14 +138,19 @@ class ComponentByOffsets(object):
         assert selfReads == ccReads, '%d != %d' % (selfReads, ccReads)
 
     def summarize(self, fp, count):
-        print('component %d: %d reads, covering %d offsets' % (
-            count, len(self), len(self.offsets)), file=fp)
+        ccLengths = ', '.join(
+            str(l) for l in map(len, self.consistentComponents))
+        print('component %d: %d reads, covering %d offsets, split into %d '
+              'consistent sub-components of lengths %s.' % (
+                  count, len(self), len(self.offsets),
+                  len(self.consistentComponents), ccLengths), file=fp)
         print('  offsets:', ', '.join(map(str, sorted(self.offsets))), file=fp)
         for read in sorted(self.reads):
             print('  ', read, file=fp)
 
         for i, cc in enumerate(self.consistentComponents, start=1):
-            cc.summarize(fp, i)
+            print(file=fp)
+            cc.summarize(fp, i, self.offsets)
 
     def saveFasta(self, outputDir, count):
         for i, cc in enumerate(self.consistentComponents, start=1):
@@ -182,3 +238,13 @@ class ComponentByOffsets(object):
 
             componentReads.difference_update(these)
             yield ConsistentComponent(these, nucleotides)
+
+    def saveConsensuses(self, outputDir, count):
+        consensusFilename = join(outputDir,
+                                 'component-%d-consensuses.fasta' % count)
+        infoFilename = join(outputDir,
+                            'component-%d-consensuses.txt' % count)
+        with open(consensusFilename, 'w') as consensusFp, open(
+                infoFilename, 'w') as infoFp:
+            for i, cc in enumerate(self.consistentComponents, start=1):
+                cc.saveConsensus(i, self.offsets, consensusFp, infoFp)
