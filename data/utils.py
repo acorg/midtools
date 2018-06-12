@@ -1,3 +1,7 @@
+from contextlib import contextmanager
+from pysam import AlignmentFile
+
+
 def baseCountsToStr(counts):
     """
     Convert base counts to a string.
@@ -50,3 +54,15 @@ def commonest(counts, drawFp=None, drawMessage=None):
             print('%s\n%s' % (drawMessage, bases), file=drawFp)
 
     return c[0][0]
+
+
+@contextmanager
+def samfile(filename):
+    """
+    A context manager to open and close a SAM/BAM file.
+
+    @param filename: A C{str} file name to open.
+    """
+    f = AlignmentFile(filename)
+    yield f
+    f.close()

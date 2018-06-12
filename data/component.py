@@ -26,15 +26,15 @@ def connectedComponentsByOffset(significantReads, threshold):
         addedSomething = True
         while addedSomething:
             addedSomething = False
-            these = set()
+            reads = set()
             for read in significantReads:
                 if offsets.intersection(read.significantOffsets):
                     addedSomething = True
-                    these.add(read)
+                    reads.add(read)
                     offsets.update(read.significantOffsets)
-            if these:
-                significantReads.difference_update(these)
-                component.update(these)
+            if reads:
+                significantReads.difference_update(reads)
+                component.update(reads)
         yield ComponentByOffsets(component, offsets, threshold)
 
 
@@ -98,8 +98,9 @@ class ConsistentComponent(object):
         print(
             Read('consistent-component-%d-consensus (based on %d reads)' %
                  (count, len(self.reads)),
-                 self.consensusSequence(componentOffsets, infoFp)
-            ).toString('fasta'), file=consensusFp, end='')
+                 self.consensusSequence(
+                     componentOffsets, infoFp)).toString('fasta'),
+            file=consensusFp, end='')
 
     def summarize(self, fp, count, componentOffsets):
         plural = '' if len(self.reads) == 1 else 's'
@@ -179,7 +180,7 @@ class ComponentByOffsets(object):
         while componentReads:
             reads = sorted(componentReads, key=key, reverse=True)
             read0 = reads[0]
-            these = {read0}
+            ccReads = {read0}
             nucleotides = defaultdict(Counter)
             for offset in read0.significantOffsets:
                 nucleotides[offset][read0.base(offset)] += 1
@@ -204,7 +205,7 @@ class ComponentByOffsets(object):
                     for offset, base in nucleotidesIfAccepted:
                         nucleotides[offset][base] += 1
                     reads.remove(read)
-                    these.add(read)
+                    ccReads.add(read)
 
             # Second phase, part 1.
             #
@@ -212,22 +213,27 @@ class ComponentByOffsets(object):
             # We do this before we add the bases of the rejects to nucleotides
             # because we don't want to pollute 'nucleotides' with a bunch of
             # bases from first-round rejects (because their bases could
-            # overwhelm the bases of the first round acceptees and lead to the
-            # acceptance of reads that would otherwise be excluded).
+            # overwhelm the bases of the first round acceptees, lead to the
+            # acceptance of reads that would otherwise be excluded, and later
+            # distort the consensus made from this component).
             acceptedRejects = set()
+            offsets = set(nucleotides)
             for read in rejected:
-                total = matching = 0
-                for offset in read.significantOffsets:
-                    base = read.base(offset)
-                    if offset in nucleotides:
-                        total += 1
-                        if base in nucleotides[offset]:
-                            matching += 1
-                if total and matching / total >= threshold:
-                    # Looks good!
-                    acceptedRejects.add(read)
-                    reads.remove(read)
-                    these.add(read)
+                # Only add rejected reads with an offset overlap with the set
+                # of reads already selected.
+                if set(read.significantOffsets) - offsets:
+                    total = matching = 0
+                    for offset in read.significantOffsets:
+                        if offset in nucleotides:
+                            total += 1
+                            if read.base(offset) in nucleotides[offset]:
+                                matching += 1
+                    if total and matching / total >= threshold:
+                        # Looks good!
+                        acceptedRejects.add(read)
+                        # TODO: the next line isn't needed?
+                        reads.remove(read)
+                        ccReads.add(read)
 
             # Second phase, part 2.
             #
@@ -236,8 +242,8 @@ class ComponentByOffsets(object):
                 for offset in accepted.significantOffsets:
                     nucleotides[offset][accepted.base(offset)] += 1
 
-            componentReads.difference_update(these)
-            yield ConsistentComponent(these, nucleotides)
+            componentReads.difference_update(ccReads)
+            yield ConsistentComponent(ccReads, nucleotides)
 
     def saveConsensuses(self, outputDir, count):
         consensusFilename = join(outputDir,

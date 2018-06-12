@@ -1,5 +1,8 @@
-from os.path import join
+import sys
+from tempfile import mkdtemp
 from os import unlink
+from os.path import exists, join, basename
+from os import mkdir
 from math import log10
 from collections import Counter
 from pathlib import Path  # This is Python 3 only.
@@ -8,65 +11,338 @@ from pprint import pprint
 
 from dark.dna import compareDNAReads
 from dark.fasta import FastaReads
-from dark.reads import ReadsInRAM, Read, Reads
+from dark.reads import Read, Reads
+from dark.sam import PaddedSAM
 
 from data.component import connectedComponentsByOffset
-from data.utils import baseCountsToStr, commonest
+from data.read import AlignedRead
+from data.utils import baseCountsToStr, commonest, samfile
 
 
 class ReadAnalysis(object):
     """
-    Hold an entire read analysis.
-    """
-    def __init__(self, fastaFile, outputDir, genomeLength, alignedReads,
-                 readCountAtOffset, baseCountAtOffset, readsAtOffset,
-                 significantOffsets, threshold, verbose, referenceGenomeFiles):
-        self.fastaFile = fastaFile
-        self.outputDir = outputDir
-        self.genomeLength = genomeLength
-        self.alignedReads = alignedReads
-        self.readCountAtOffset = readCountAtOffset
-        self.baseCountAtOffset = baseCountAtOffset
-        self.readsAtOffset = readsAtOffset
-        self.significantOffsets = significantOffsets
-        self.threshold = threshold
-        self.verbose = verbose
-        self._removePreExistingOutputFiles()
-        self.referenceGenomes = self._readReferenceGenomes(
-            referenceGenomeFiles)
-        self.components = self._findConnectedComponents()
+    Perform a read alignment analysis to help with multiple infection
+    detection.
 
-    def _readReferenceGenomes(self, referenceGenomeFiles):
+    @param alignmentFiles: A C{list} of C{str} names of SAM/BAM alignment
+        files.
+    @param referenceGenomeFiles: A C{list} of C{str} names of FASTA files
+        containing reference genomes.
+    @param referenceIds: The C{str} sequence ids whose alignment should be
+        analyzed. All ids must be present in the C{referenceGenomes} files.
+        One of the SAM/BAM files given using C{alignmentFiles} should have an
+        alignment against the given argument. If omitted, all references that
+        are aligned to in the given BAM/SAM files will be analyzed.
+    @param outputDir: The C{str} directory to save result files to.
+    @param minReads: The C{int} minimum number of reads that must cover a
+        location for it to be considered significant.
+    @param homogeneousCutoff: If the most common nucleotide at a location
+        occurs more than this C{float} fraction of the time (i.e., amongst all
+        reads that cover the location) then the locaion will be considered
+        homogeneous and therefore uninteresting.
+    @param agreementThreshold: Only reads with agreeing nucleotides at
+        at least this C{float} fraction of the significant sites they have in
+        common will be considered connected (this is for the second phase of
+        adding reads to a component.
+    @param saveReducedFASTA: If C{True}, write out a FASTA file of the original
+        input but with just the signifcant locations.
+    @param verbose: If C{True}, print verbose output.
+    """
+    DEFAULT_HOMOGENEOUS_CUTOFF = 0.9
+    DEFAULT_MIN_READS = 5
+    DEFAULT_AGREEMENT_THRESHOLD = 0.55
+
+    def __init__(self, alignmentFiles, referenceGenomeFiles, referenceIds=None,
+                 outputDir=None, minReads=DEFAULT_MIN_READS,
+                 homogeneousCutoff=DEFAULT_HOMOGENEOUS_CUTOFF,
+                 agreementThreshold=DEFAULT_AGREEMENT_THRESHOLD,
+                 saveReducedFASTA=False, verbose=False):
+
+        self.alignmentFiles = alignmentFiles
+        self.referenceGenomeFiles = referenceGenomeFiles
+        self.referenceIds = referenceIds
+        self.outputDir = outputDir
+        self.minReads = minReads
+        self.homogeneousCutoff = homogeneousCutoff
+        self.agreementThreshold = agreementThreshold
+        self.saveReducedFASTA = saveReducedFASTA
+        self.verbose = verbose
+
+    def run(self):
         """
-        Read reference genomes from files and check their lengths match the
-        aligned reads.
+        Perform the read analysis for all reference sequences.
         """
-        result = ReadsInRAM()
-        if referenceGenomeFiles:
-            for filename in referenceGenomeFiles:
-                for read in FastaReads(filename):
-                    if len(read) == self.genomeLength:
-                        result.add(read)
-                    else:
-                        print('WARNING: Reference genome %s in file %s has '
-                              'length %d but the provided aligned reads were '
-                              'aligned against something of length %d. This '
-                              'reference will be ignored.' % (
-                                  read.id, filename, len(read),
-                                  self.genomeLength))
+        outputDir = self._setupOutputDir()
+        self.referenceGenomes = self._readReferenceGenomes()
+        self._checkReferenceIdsHaveGenomes()
+        alignedReferences = self._checkReferenceIdsAreInAlignmentFiles()
+
+        # If we weren't told which reference ids to examine the alignments of,
+        # examine everything available.
+        if not self.referenceIds:
+            self.referenceIds = alignedReferences
             if self.verbose:
-                print('Read %d reference genomes' % len(result))
+                print('Analyzing %d reference alignment%s:\n%s' %
+                      (len(alignedReferences),
+                       '' if len(alignedReferences) == 1 else 's',
+                       '\n'.join('  %s' % id_ for id_ in alignedReferences)))
+
+        for alignmentFile in self.alignmentFiles:
+            self._analyzeAlignmentFile(alignmentFile, outputDir)
+
+    def _analyzeAlignmentFile(self, alignmentFilename, outputDir):
+        """
+        Analyze all the relevant alignments in C{filename}.
+
+        @param alignmentFilename: The C{str} name of an alignment file.
+        @param outputDir: The C{str} name of the output directory.
+        """
+        for referenceId in self.referenceIds:
+            self._analyzeReferenceId(referenceId, alignmentFilename, outputDir)
+
+    def _analyzeReferenceId(self, referenceId, alignmentFilename, outputDir):
+        """
+        Analyze the given reference id in the given alignment file (if an
+        alignment to the reference id is present).
+
+        @param referenceId: The C{str} id of the reference sequence to analyze.
+        @param alignmentFilename: The C{str} name of an alignment file.
+        @param outputDir: The C{str} name of the output directory.
+
+        @return: TODO..................
+        """
+        (thisOutputDir,
+         shortAlignmentFilename,
+         shortReferenceId) = self._setupAlignmentReferenceOutputDir(
+                referenceId, alignmentFilename, outputDir)
+
+        with samfile(alignmentFilename) as sam:
+            tid = sam.get_tid(referenceId)
+            if tid == -1:
+                return
+            else:
+                genomeLength = sam.lengths[tid]
+
+        alignedReads = []
+        for query in PaddedSAM(alignmentFilename).queries(
+                referenceName=referenceId):
+            assert len(query) == genomeLength
+            alignedReads.append(AlignedRead(query.id, query.sequence))
+
+        readCountAtOffset, baseCountAtOffset, readsAtOffset = self._gatherData(
+            genomeLength, alignedReads)
+
+        significantOffsets = list(self._findSignificantOffsets(
+            baseCountAtOffset, readCountAtOffset))
+
+        if self.verbose:
+            print('Read %d aligned reads of length %d. '
+                  'Found %d significant locations.' %
+                  (len(alignedReads), genomeLength, len(significantOffsets)))
+
+        if not significantOffsets:
+            print('No significant locations for alignment/reference combo...')
+            return
+
+        for read in alignedReads:
+            read.setSignificantOffsets(significantOffsets)
+
+        components = self._findConnectedComponents(alignedReads,
+                                                   significantOffsets)
+
+        self.saveSignificantOffsets(significantOffsets, thisOutputDir)
+        self.saveComponentFasta(components, thisOutputDir)
+        if self.saveReducedFASTA:
+            self.saveReducedFasta(significantOffsets, thisOutputDir)
+        self.summarize(alignedReads, significantOffsets, components,
+                       genomeLength, thisOutputDir)
+        self.saveComponentConsensuses(components, thisOutputDir)
+        self.saveClosestReferenceConsensuses(
+            components, baseCountAtOffset, genomeLength, thisOutputDir)
+
+    def _findSignificantOffsets(self, baseCountAtOffset, readCountAtOffset):
+        """
+        Find the genome offsets that have significant base variability.
+
+        @param baseCountAtOffset: A C{list} of C{Counter} instances giving
+            the count of each nucleotide at each genome offset.
+        @param readCountAtOffset: A C{list} of C{int} counts of the total
+            number of reads at each genome offset (i.e., just the sum of the
+            values in C{baseCountAtOffset})
+        @return: A generator that yields 0-based significant offsets.
+        """
+        minReads = self.minReads
+        homogeneousCutoff = self.homogeneousCutoff
+
+        for offset, (readCount, counts) in enumerate(
+                zip(readCountAtOffset, baseCountAtOffset)):
+            if (readCount >= minReads and
+                    max(counts.values()) / readCount <= homogeneousCutoff):
+                yield offset
+
+    def _gatherData(self, genomeLength, alignedReads):
+        """
+        Analyze the aligned reads.
+
+        @param genomeLength: The C{int} length of the genome the reads were
+            aligned to.
+        @param alignedReads: A C{list} of C{AlignedRead} instances.
+        @return: A tuple of C{list}s (readCountAtOffset, baseCountAtOffset,
+            readsAtOffset), each indexed from zero to the genom length.
+        """
+        readCountAtOffset = []
+        baseCountAtOffset = []
+        readsAtOffset = []
+
+        nucleotides = set('ACGT')
+
+        for offset in range(genomeLength):
+            reads = set()
+            counts = Counter()
+            for read in alignedReads:
+                base = read.base(offset)
+                if base in nucleotides:
+                    counts[base] += 1
+                    reads.add(read)
+            baseCountAtOffset.append(counts)
+            readCountAtOffset.append(sum(counts.values()))
+            readsAtOffset.append(reads)
+
+        return readCountAtOffset, baseCountAtOffset, readsAtOffset
+
+    def _setupOutputDir(self):
+        """
+        Set up the output directory and return its path.
+
+        @return: The C{str} path of the output directory.
+        """
+        if self.outputDir:
+            outputDir = self.outputDir
+            if exists(outputDir):
+                self._removePreExistingTopLevelOutputFiles()
+            else:
+                mkdir(outputDir)
+        else:
+            outputDir = mkdtemp()
+            print('Writing output files to %s' % outputDir)
+        return outputDir
+
+    def _setupAlignmentReferenceOutputDir(self, referenceId,
+                                          alignmentFilename, outputDir):
+        """
+        Set up the output directory for a given alignment file and reference.
+
+        @param referenceId: The C{str} id of the reference sequence.
+        @param alignmentFilename: The C{str} name of an alignment file.
+        @param outputDir: The C{str} name of the top-level output directory.
+
+        @return: A 3-tuple with the C{str} names of the output directory and
+            the short alignment and reference sub-directory names.
+        """
+        # Make short versions of the reference id and filename for a
+        # per-alignment-file per-reference-sequence output directory.
+        shortReferenceId = referenceId.split()[0]
+        shortAlignmentFilename = basename(alignmentFilename).rsplit(
+            '.', maxsplit=1)[0]
+
+        directory = join(outputDir, shortAlignmentFilename)
+        if not exists(directory):
+            mkdir(directory)
+
+        directory = join(directory, shortReferenceId)
+        if exists(directory):
+            self._removePreExistingOutputFiles(directory)
+        else:
+            mkdir(directory)
+
+        return directory, shortAlignmentFilename, shortReferenceId
+
+    def _checkReferenceIdsHaveGenomes(self):
+        """
+        If any reference ids were given, check that we have a reference genome
+        for each.
+
+        @raise ValueError: If any reference id is not present in the
+            reference genome files.
+        """
+        for id_ in self.referenceIds or []:
+            if id_ not in self.referenceGenomes:
+                raise ValueError(
+                    'Reference id %r is not present in any reference genome '
+                    'file.' % id_)
+
+    def _checkReferenceIdsAreInAlignmentFiles(self):
+        """
+        If any reference ids were given, check that there is at least one
+        alignment file that contains alignments against the reference id.
+
+        @raise ValueError: If any reference id is not present in any alignment
+            file.
+        @return: A C{set} of C{str} reference ids as found in all passed
+            alignment files.
+        """
+        # Get the names of all references in all alignment files.
+        alignedReferences = set()
+        for filename in self.alignmentFiles:
+            with samfile(filename) as sam:
+                for i in range(sam.nreferences):
+                    alignedReferences.add(sam.get_reference_name(i))
+
+        if self.referenceIds:
+            missing = set(self.referenceIds) - alignedReferences
+            if missing:
+                raise ValueError(
+                    'Alignments against the following reference id%s are not '
+                    'present in any alignment file:\n%s' %
+                    ('' if len(missing) == 1 else 's',
+                     '\n'.join('  %s' % id_ for id_ in sorted(missing))))
+
+        return alignedReferences
+
+    def _readReferenceGenomes(self):
+        """
+        Read reference genomes from files and check that any duplicates have
+        identical sequences.
+
+        @raise ValueError: If a reference genome is found in more than one file
+            and the sequences are not identical.
+        @return: A C{dict} keyed by C{str} sequence id with C{dark.Read}
+            values holding reference genomes.
+        """
+        result = {}
+        seen = {}
+        for filename in self.referenceGenomeFiles:
+            for read in FastaReads(filename):
+                id_ = read.id
+                if id_ in seen:
+                    if result[id_].sequence != read.sequence:
+                        raise ValueError(
+                            'Reference genome id %r was found in two files '
+                            '(%r and %r) but with different sequences.' %
+                            (id_, seen[id_], filename))
+                else:
+                    seen[id_] = filename
+                    result[id_] = read
+        if self.verbose:
+            print('Read %d reference genome%s:\n%s' % (
+                len(result), '' if len(result) == 1 else 's',
+                '\n'.join('  %s' % id_ for id_ in result)))
         return result
 
-    def _findConnectedComponents(self):
+    def _findConnectedComponents(self, alignedReads, significantOffsets):
         """
         Find all connected components.
+
+        @param alignedReads: A list of C{AlignedRead} instances.
+        @param significantOffsets: A C{set} of signifcant offsets.
+        @return: A C{list} of C{connectedComponentsByOffset} instances.
         """
-        significantReads = set(read for read in self.alignedReads
+        significantReads = set(read for read in alignedReads
                                if read.significantOffsets)
         components = []
         for count, component in enumerate(
-                connectedComponentsByOffset(significantReads, self.threshold),
+                connectedComponentsByOffset(significantReads,
+                                            self.agreementThreshold),
                 start=1):
             components.append(component)
 
@@ -75,40 +351,69 @@ class ReadAnalysis(object):
         assert len(significantReads) == 0
         return components
 
-    def _removePreExistingOutputFiles(self):
-        # Remove all pre-existing files from the output directory.
+    def _removePreExistingTopLevelOutputFiles(self):
+        """
+        Remove all pre-existing files from the top-level output directory.
+        """
+        pass
+
+    def _removePreExistingOutputFiles(self, directory):
+        """
+        Remove all pre-existing files from the output directory for a
+        particular reference sequence alignment.
+
+        @param directory: The C{str} directory to examine.
+        """
         # This prevents us from doing a run that results in (say) 6
         # component files and then later doing a run that results in
         # only 5 components and erroneously thinking that
         # component-6-2.fasta etc. are from the most recent run.
-        dir = self.outputDir
-
         paths = list(map(str, chain(
-            Path(dir).glob('component-*.fasta'),
-            Path(dir).glob('component-*.txt'),
-            Path(dir).glob('significant-offsets.txt'))))
+            Path(directory).glob('component-*.fasta'),
+            Path(directory).glob('component-*.txt'),
+            Path(directory).glob('significant-offsets.txt'))))
 
         if paths:
             if self.verbose:
                 print('Removing %d pre-existing output file%s from %s '
                       'directory.' %
-                      (len(paths), '' if len(paths) == 1 else 's', dir))
+                      (len(paths), '' if len(paths) == 1 else 's', directory))
             list(map(unlink, paths))
 
-    def saveComponentFasta(self):
-        for count, component in enumerate(self.components):
-            component.saveFasta(self.outputDir, count)
+    def saveComponentFasta(self, components, outputDir):
+        """
+        Save FASTA for each component.
 
-    def saveSignificantOffsets(self):
-        with open(join(self.outputDir, 'significant-offsets.txt'), 'w') as fp:
-            for offset in self.significantOffsets:
+        @param outputDir: A C{str} directory path.
+        """
+        if self.verbose:
+            print('Saving component FASTA')
+        for count, component in enumerate(components):
+            component.saveFasta(outputDir, count)
+
+    def saveSignificantOffsets(self, significantOffsets, outputDir):
+        """
+        Save the significant offsets.
+
+        @param significantOffsets: A C{set} of signifcant offsets.
+        @param outputDir: A C{str} directory path.
+        """
+        if self.verbose:
+            print('Saving significant offsets')
+        with open(join(outputDir, 'significant-offsets.txt'), 'w') as fp:
+            for offset in significantOffsets:
                 print(offset, file=fp)
 
-    def saveBaseFrequencies(self):
+    def saveBaseFrequencies(self, outputDir):
+        """
+        Save the base frequencies.
+
+        @param outputDir: A C{str} directory path.
+        """
         genomeLengthWidth = int(log10(self.genomeLength)) + 1
         nucleotides = set('ACGT')
 
-        with open(join(self.outputDir, 'base-frequencies.txt'), 'w') as fp:
+        with open(join(outputDir, 'base-frequencies.txt'), 'w') as fp:
             for offset in range(self.genomeLength):
                 counts = Counter()
                 for read in self.readsAtOffset[offset]:
@@ -119,9 +424,17 @@ class ReadAnalysis(object):
                       (genomeLengthWidth, offset + 1, baseCountsToStr(counts)),
                       file=fp)
 
-    def saveClosestReferenceConsensuses(self):
+    def saveClosestReferenceConsensuses(self, components, baseCountAtOffset,
+                                        genomeLength, outputDir):
         """
         Calculate and save the best consensus to each reference genome.
+
+        @param components: A C{list} of C{ComponentByOffsets} instances.
+        @param baseCountAtOffset: A C{list} of C{Counter} instances giving
+            the count of each nucleotide at each genome offset.
+        @param genomeLength: The C{int} length of the genome the reads were
+            aligned to.
+        @param outputDir: A C{str} directory path.
         """
         def ccMatchCount(cc, reference, drawFp, drawMessage):
             """
@@ -200,10 +513,11 @@ class ReadAnalysis(object):
 
             return bestIndex
 
-        baseCountAtOffset = self.baseCountAtOffset
+        if self.verbose:
+            print('Saving closest consensuses to references')
 
-        for reference in self.referenceGenomes:
-
+        for referenceName in sorted(self.referenceGenomes):
+            reference = self.referenceGenomes[referenceName]
             fields = reference.id.split(maxsplit=1)
             if len(fields) == 1:
                 shortReferenceId = reference.id
@@ -212,14 +526,13 @@ class ReadAnalysis(object):
                 shortReferenceId = fields[0]
                 referenceIdRest = ' ' + fields[1]
 
-            infoFile = join(self.outputDir,
-                            '%s-consensus.txt' % shortReferenceId)
+            infoFile = join(outputDir, '%s-consensus.txt' % shortReferenceId)
             with open(infoFile, 'w') as infoFp:
                 offsetsDone = set()
-                consensus = [None] * self.genomeLength
+                consensus = [None] * genomeLength
                 bestCcIndices = []
-                for count, component in enumerate(self.components, start=1):
-                    print('\nExamimining component %d with %d offsets: %s' %
+                for count, component in enumerate(components, start=1):
+                    print('\nExamining component %d with %d offsets: %s' %
                           (count, len(component.offsets),
                            ', '.join(map(str, sorted(component.offsets)))),
                           file=infoFp)
@@ -227,7 +540,8 @@ class ReadAnalysis(object):
                                                           infoFp)
                     bestCcIndices.append(bestCcIndex)
                     bestCc = component.consistentComponents[bestCcIndex]
-                    print('  Adding best nucleotides to consensus:', file=infoFp)
+                    print('  Adding best nucleotides to consensus:',
+                          file=infoFp)
                     for offset in bestCc.nucleotides:
                         assert consensus[offset] is None
                         base = commonest(
@@ -257,20 +571,24 @@ class ReadAnalysis(object):
 
                 # Fill in (from the overall read consensus) the offsets
                 # that were not significant in any connected component.
-                consensusOffsets = set(range(self.genomeLength)) - offsetsDone
+                consensusOffsets = set(range(genomeLength)) - offsetsDone
                 print('\nAdding bases from %d non-connected-component '
                       'consensus offsets:' % len(consensusOffsets),
                       file=infoFp)
                 for offset in consensusOffsets:
                     assert consensus[offset] is None
-                    base = commonest(
-                        baseCountAtOffset[offset], infoFp,
-                        ('    WARNING: consensus base count draw at offset %d '
-                         % offset) + ' %(baseCounts)s.')
-                    print('  Offset %d: %s from nucleotides %s' %
-                          (offset, base,
-                           baseCountsToStr(baseCountAtOffset[offset])),
-                          file=infoFp, end='')
+                    baseCount = baseCountAtOffset[offset]
+                    if baseCount:
+                        base = commonest(
+                            baseCount, infoFp,
+                            ('    WARNING: consensus base count draw at '
+                             'offset %d' % offset) + ' %(baseCounts)s.')
+                        print('  Offset %d: %s from nucleotides %s' %
+                              (offset, base, baseCountsToStr(baseCount)),
+                              file=infoFp, end='')
+                    else:
+                        # The reads did not cover this offset.
+                        base = '-'
                     referenceBase = reference.sequence[offset]
                     if base == referenceBase:
                         print(file=infoFp)
@@ -279,7 +597,7 @@ class ReadAnalysis(object):
                               referenceBase, file=infoFp)
                     consensus[offset] = base
 
-                filename = join(self.outputDir,
+                filename = join(outputDir,
                                 '%s-consensus.fasta' % shortReferenceId)
                 consensusId = (
                     '%s-consensus best-consistent-components:%s%s' %
@@ -292,7 +610,7 @@ class ReadAnalysis(object):
 
                 identity = (
                     match['match']['identicalMatchCount'] +
-                    match['match']['ambiguousMatchCount']) / self.genomeLength
+                    match['match']['ambiguousMatchCount']) / genomeLength
 
                 print('\nIdentity of reference with consensus: identity %.2f'
                       % (identity * 100.0), file=infoFp)
@@ -300,39 +618,71 @@ class ReadAnalysis(object):
                 pprint(match, indent=4, stream=infoFp)
                 Reads([reference, consensusRead]).save(filename)
 
-    def saveReducedFasta(self):
+    def saveReducedFasta(self, significantOffsets, outputDir):
         """
         Write out FASTA that contains reads with bases just at the
         significant offsets.
+
+        @param significantOffsets: A C{set} of signifcant offsets.
+        @param outputDir: A C{str} directory path.
         """
-        allGaps = '-' * len(self.significantOffsets)
+        if self.verbose:
+            print('Saving reduced FASTA')
+
+        print('Saving reduced FASTA not implemented yet')
+        return
+
+        allGaps = '-' * len(significantOffsets)
 
         def unwanted(read):
             return (None if read.sequence == allGaps else read)
 
         FastaReads(self.fastaFile).filter(
-            keepSites=self.significantOffsets).filter(
-                modifier=unwanted).save(join(self.outputDir, 'reduced.fasta'))
+            keepSites=significantOffsets).filter(
+                modifier=unwanted).save(join(outputDir, 'reduced.fasta'))
 
-    def saveComponentConsensuses(self):
-        for count, component in enumerate(self.components, start=1):
-            component.saveConsensuses(self.outputDir, count)
+    def saveComponentConsensuses(self, components, outputDir):
+        """
+        Write out a component consensus sequence.
 
-    def summarize(self):
-        with open(join(self.outputDir, 'component-summary.txt'), 'w') as fp:
+        @param components: A C{list} of C{ComponentByOffsets} instances.
+        @param outputDir: A C{str} directory path.
+        """
+        if self.verbose:
+            print('Saving component consensuses')
+
+        for count, component in enumerate(components, start=1):
+            component.saveConsensuses(outputDir, count)
+
+    def summarize(self, alignedReads, significantOffsets, components,
+                  genomeLength, outputDir):
+        """
+        Write out an analysis summary.
+
+        @param alignedReads: A C{list} of C{AlignedRead} instances.
+        @param significantOffsets: A C{set} of signifcant offsets.
+        @param components: A C{list} of C{ComponentByOffsets} instances.
+        @param genomeLength: The C{int} length of the genome the reads were
+            aligned to.
+        @param outputDir: A C{str} directory path.
+        """
+        if self.verbose:
+            print('Writing analysis summary')
+
+        with open(join(outputDir, 'component-summary.txt'), 'w') as fp:
 
             print('Read %d aligned reads of length %d. '
                   'Found %d significant locations.' %
-                  (len(self.alignedReads), self.genomeLength,
-                   len(self.significantOffsets)), file=fp)
+                  (len(alignedReads), genomeLength,
+                   len(significantOffsets)), file=fp)
 
             print('Reads were assigned to %d connected components:' %
-                  len(self.components), file=fp)
+                  len(components), file=fp)
 
             totalReads = 0
-            for count, component in enumerate(self.components, start=1):
+            for count, component in enumerate(components, start=1):
 
-                filename = join(self.outputDir, 'component-%d.txt' % count)
+                filename = join(outputDir, 'component-%d.txt' % count)
                 with open(filename, 'w') as fp2:
                     component.summarize(fp2, count)
 
