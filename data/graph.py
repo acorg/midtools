@@ -69,5 +69,5 @@ def componentOffsets(component):
     offsets = set()
     for node in component:
         read = node.read
-        offsets.update(range(read.offset, read.offset + len(read.read)))
+        offsets.update(range(read.offset, read.offset + len(read)))
     return offsets

@@ -48,10 +48,13 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
                     if commonCount < minCommonReads:
                         rowScores.append(0.0)
                         rowText.append(
-                            '%d (%d read%s) vs %d (%d read%s)<br>Too few (%d) reads in common' %
-                            (offset2 + 1, len(readsAtOffset[offset2]), '' if len(readsAtOffset[offset2]) == 1 else 's',
-                             offset1 + 1, len(readsAtOffset[offset1]), '' if len(readsAtOffset[offset1]) == 1 else 's',
-                            commonCount))
+                            '%d (%d read%s) vs %d (%d read%s)<br>Too few (%d) '
+                            'reads in common' %
+                            (offset2 + 1, len(readsAtOffset[offset2]),
+                             '' if len(readsAtOffset[offset2]) == 1 else 's',
+                             offset1 + 1, len(readsAtOffset[offset1]),
+                             '' if len(readsAtOffset[offset1]) == 1 else 's',
+                             commonCount))
                     else:
                         bases1 = []
                         bases2 = []
@@ -65,21 +68,25 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
                             print(bases2)
                         # f = (adjusted_mutual_info_score if offset2 > offset1
                         #      else adjusted_rand_score)
-                        f = (normalized_information_distance if offset2 > offset1
-                             else adjusted_rand_score)
+                        f = (normalized_information_distance
+                             if offset2 > offset1 else adjusted_rand_score)
 
                         rowScores.append(f(bases1, bases2))
                         rowText.append(
-                            '%d (%d read%s) vs %d (%d read%s)<br>%d read%s in common' %
-                            (offset2 + 1, len(readsAtOffset[offset2]), '' if len(readsAtOffset[offset2]) == 1 else 's',
-                             offset1 + 1, len(readsAtOffset[offset1]), '' if len(readsAtOffset[offset1]) == 1 else 's',
+                            '%d (%d read%s) vs %d (%d read%s)<br>%d read%s in '
+                            'common' %
+                            (offset2 + 1, len(readsAtOffset[offset2]),
+                             '' if len(readsAtOffset[offset2]) == 1 else 's',
+                             offset1 + 1, len(readsAtOffset[offset1]),
+                             '' if len(readsAtOffset[offset1]) == 1 else 's',
                              commonCount,
                              '' if commonCount == 1 else 's'))
-                        # print('offset %d vs %d = %.4f (%d)' % (offset1, offset2, rowScores[-1], commonCount))
+                        # print('offset %d vs %d = %.4f (%d)' %
+                        # (offset1, offset2, rowScores[-1], commonCount))
                 else:
                     rowScores.append(-0.25)
-                    rowText.append(
-                        '%d vs %d, no reads in common' % (offset1 + 1, offset2 + 1))
+                    rowText.append('%d vs %d, no reads in common' %
+                                   (offset1 + 1, offset2 + 1))
 
         scores.append(rowScores)
         text.append(rowText)

@@ -227,7 +227,7 @@ if __name__ == '__main__':
         help='Print verbose textual output showing read connections.')
 
     parser.add_argument(
-        '--sortOn', choices=('max', 'entropy'), default=None,
+        '--sortOn', choices=('max', 'entropy'),
         help=('If specified, locations will be sorted according to either the '
               'maximum nucleotide frequency or the nucleotide entropy at the '
               'location.'))
@@ -259,7 +259,7 @@ if __name__ == '__main__':
               file=sys.stderr)
         sys.exit(1)
 
-    (genomeLen, alignedReads, readCountAtOffset,
+    (genomeLength, alignedReads, readCountAtOffset,
      baseCountAtOffset, readsAtOffset,
      significantOffsets) = parseCommandLineOptions(args, True)
 

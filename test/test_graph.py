@@ -21,7 +21,7 @@ class TestConnectedComponents(TestCase):
         A set of one node should result in one connected component with just
         that one node in it.
         """
-        read = AlignedRead(Read('id', 'ACGT'))
+        read = AlignedRead('id', 'ACGT')
         node = Node(read)
         self.assertEqual(
             [
@@ -34,9 +34,9 @@ class TestConnectedComponents(TestCase):
         A list of two unconnected nodes should result in two connected
         components with one node in each.
         """
-        read1 = AlignedRead(Read('id1', 'ACGT'))
+        read1 = AlignedRead('id1', 'ACGT')
         node1 = Node(read1)
-        read2 = AlignedRead(Read('id2', 'ACGT'))
+        read2 = AlignedRead('id2', 'ACGT')
         node2 = Node(read2)
         result = list(connectedComponents([node1, node2]))
         self.assertTrue(
@@ -47,9 +47,9 @@ class TestConnectedComponents(TestCase):
         A list of two connected nodes should result in one connected
         component containing both nodes.
         """
-        read1 = AlignedRead(Read('id1', 'ACGT'))
+        read1 = AlignedRead('id1', 'ACGT')
         node1 = Node(read1)
-        read2 = AlignedRead(Read('id2', 'ACGT'))
+        read2 = AlignedRead('id2', 'ACGT')
         node2 = Node(read2)
         node1.add(node2)
         node2.add(node1)
@@ -61,13 +61,13 @@ class TestConnectedComponents(TestCase):
         A list of two connected nodes and one that's unconnected should result
         in one connected component containing both nodes and one singleton.
         """
-        read1 = AlignedRead(Read('id1', 'ACGT'))
+        read1 = AlignedRead('id1', 'ACGT')
         node1 = Node(read1)
-        read2 = AlignedRead(Read('id2', 'ACGT'))
+        read2 = AlignedRead('id2', 'ACGT')
         node2 = Node(read2)
         node1.add(node2)
         node2.add(node1)
-        read3 = AlignedRead(Read('id3', 'ACGT'))
+        read3 = AlignedRead('id3', 'ACGT')
         node3 = Node(read3)
         result = list(connectedComponents([node1, node2, node3]))
         self.assertTrue(
@@ -81,13 +81,13 @@ class TestConnectedComponents(TestCase):
         This must be able to be repeated (i.e., the code in
         connectedComponents must not disrupt the original graph data).
         """
-        read1 = AlignedRead(Read('id1', 'ACGT'))
+        read1 = AlignedRead('id1', 'ACGT')
         node1 = Node(read1)
-        read2 = AlignedRead(Read('id2', 'ACGT'))
+        read2 = AlignedRead('id2', 'ACGT')
         node2 = Node(read2)
         node1.add(node2)
         node2.add(node1)
-        read3 = AlignedRead(Read('id3', 'ACGT'))
+        read3 = AlignedRead('id3', 'ACGT')
         node3 = Node(read3)
 
         for _ in range(5):
@@ -105,7 +105,7 @@ class TestComponentOffsets(TestCase):
         """
         A read with no leading gaps should have offsets starting from zero.
         """
-        read = AlignedRead(Read('id', 'ACGT'))
+        read = AlignedRead('id', 'ACGT')
         node = Node(read)
         self.assertEqual({0, 1, 2, 3}, componentOffsets({node}))
 
@@ -113,7 +113,7 @@ class TestComponentOffsets(TestCase):
         """
         A read with 3 leading gaps should have offsets starting from 3.
         """
-        read = AlignedRead(Read('id', '---ACGT'))
+        read = AlignedRead('id', '---ACGT')
         node = Node(read)
         self.assertEqual({3, 4, 5, 6}, componentOffsets({node}))
 
@@ -121,7 +121,7 @@ class TestComponentOffsets(TestCase):
         """
         A read with trailing gaps should have offsets starting from 0.
         """
-        read = AlignedRead(Read('id', 'ACGT----'))
+        read = AlignedRead('id', 'ACGT----')
         node = Node(read)
         self.assertEqual({0, 1, 2, 3}, componentOffsets({node}))
 
@@ -130,6 +130,6 @@ class TestComponentOffsets(TestCase):
         A read with 2 leading gaps and some trailing gaps should have offsets
         starting from 2.
         """
-        read = AlignedRead(Read('id', '--ACGT-------'))
+        read = AlignedRead('id', '--ACGT-------')
         node = Node(read)
         self.assertEqual({2, 3, 4, 5}, componentOffsets({node}))

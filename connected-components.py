@@ -62,15 +62,18 @@ if __name__ == '__main__':
               'with just the signifcant locations.'))
 
     parser.add_argument(
-        '--verbose', action='store_true', default=False,
-        help='Print verbose output showing read connections.')
+        '--verbose', type=int, default=0,
+        help=('The integer verbosity level (0 = no output, 1 = some output, '
+              'etc).'))
 
     args = parser.parse_args()
 
+    referenceIds = (list(chain.from_iterable(args.referenceId))
+                    if args.referenceId else None)
     ReadAnalysis(
         alignmentFiles=list(chain.from_iterable(args.alignmentFile)),
         referenceGenomeFiles=list(chain.from_iterable(args.referenceGenome)),
-        referenceIds=list(chain.from_iterable(args.referenceId)),
+        referenceIds=referenceIds,
         outputDir=args.outputDir,
         minReads=args.minReads,
         homogeneousCutoff=args.homogeneousCutoff,

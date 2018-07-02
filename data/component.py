@@ -1,9 +1,11 @@
+from __future__ import print_function, division
+
 from os.path import join
 from collections import defaultdict, Counter
 
 from dark.reads import Read
 
-from data.utils import nucleotidesToStr, commonest
+from data.utils import nucleotidesToStr, commonest, fastaIdentityTable
 
 
 def connectedComponentsByOffset(significantReads, threshold):
@@ -20,7 +22,8 @@ def connectedComponentsByOffset(significantReads, threshold):
     @return: A generator that yields C{ComponentByOffsets} instances.
     """
     while significantReads:
-        element = significantReads.pop()
+        element = sorted(significantReads)[0]
+        significantReads.remove(element)
         component = {element}
         offsets = set(element.significantOffsets)
         addedSomething = True
@@ -153,9 +156,12 @@ class ComponentByOffsets(object):
             print(file=fp)
             cc.summarize(fp, i, self.offsets)
 
-    def saveFasta(self, outputDir, count):
+    def saveFasta(self, outputDir, count, verbose):
         for i, cc in enumerate(self.consistentComponents, start=1):
             filename = join(outputDir, 'component-%d-%d.fasta' % (count, i))
+            if verbose > 1:
+                print('      Saving component %d %d FASTA to' % (count, i),
+                      filename)
             with open(filename, 'w') as fp:
                 cc.saveFasta(fp)
 
@@ -165,12 +171,6 @@ class ComponentByOffsets(object):
         in self.threshold) according to what nucleotides they have at their
         significant offsets.
         """
-        def key(read):
-            """
-            We'll sort the avaialable reads by the number of significant
-            offsets they have, then by start offset in the genome.
-            """
-            return (len(read.significantOffsets), read.offset)
 
         threshold = self.threshold
 
@@ -178,7 +178,7 @@ class ComponentByOffsets(object):
         componentReads = set(self.reads)
 
         while componentReads:
-            reads = sorted(componentReads, key=key, reverse=True)
+            reads = sorted(componentReads)
             read0 = reads[0]
             ccReads = {read0}
             nucleotides = defaultdict(Counter)
@@ -188,20 +188,24 @@ class ComponentByOffsets(object):
 
             # First phase:
             #
-            # Add all the reads that agree exactly at all the offsets in the
-            # set so far.
+            # Add all the reads that agree exactly at all the offsets
+            # covered by the set of reads so far.
             for read in reads[1:]:
                 nucleotidesIfAccepted = []
                 for offset in read.significantOffsets:
+                    # Sanity check:
                     base = read.base(offset)
                     if offset in nucleotides:
+                        # Sanity check: in phase one there can only be one
+                        # nucleotide at each offset.
+                        assert len(nucleotides[offset]) == 1
                         if base not in nucleotides[offset]:
                             # Not an exact match. Reject this read for now.
                             rejected.add(read)
                             break
                     nucleotidesIfAccepted.append((offset, base))
                 else:
-                    # We didn't break, so add this read.
+                    # We didn't break, so add this read and its nucleotides.
                     for offset, base in nucleotidesIfAccepted:
                         nucleotides[offset][base] += 1
                     reads.remove(read)
@@ -221,7 +225,7 @@ class ComponentByOffsets(object):
             for read in rejected:
                 # Only add rejected reads with an offset overlap with the set
                 # of reads already selected.
-                if set(read.significantOffsets) - offsets:
+                if set(read.significantOffsets) & offsets:
                     total = matching = 0
                     for offset in read.significantOffsets:
                         if offset in nucleotides:
@@ -245,12 +249,26 @@ class ComponentByOffsets(object):
             componentReads.difference_update(ccReads)
             yield ConsistentComponent(ccReads, nucleotides)
 
-    def saveConsensuses(self, outputDir, count):
-        consensusFilename = join(outputDir,
-                                 'component-%d-consensuses.fasta' % count)
-        infoFilename = join(outputDir,
-                            'component-%d-consensuses.txt' % count)
+    def saveConsensuses(self, outputDir, count, verbose):
+        consensusFilename = join(
+            outputDir, 'component-%d-consensuses.fasta' % count)
+        infoFilename = join(
+            outputDir, 'component-%d-consensuses.txt' % count)
+        if verbose:
+            print('      Saving component %d consensus FASTA to %s\n'
+                  '      Saving component %d consensus info to %s' %
+                  (count, consensusFilename, count, infoFilename))
         with open(consensusFilename, 'w') as consensusFp, open(
                 infoFilename, 'w') as infoFp:
             for i, cc in enumerate(self.consistentComponents, start=1):
                 cc.saveConsensus(i, self.offsets, consensusFp, infoFp)
+
+        # Write out an HTML table showing the identity between the various
+        # component consensuses.
+        identityTableFilename = join(
+            outputDir, 'component-%d-consensuses-identity.html' % count)
+        if verbose:
+            print('      Saving component %d consensus identity table to %s' %
+                  (count, identityTableFilename))
+
+        fastaIdentityTable(consensusFilename, identityTableFilename, verbose)

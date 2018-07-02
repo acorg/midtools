@@ -41,8 +41,9 @@ class AlignedRead(Read):
 
     def __str__(self):
         if self.significantOffsets:
-            bases = ', bases %s, offsets %s' % (
+            bases = ', bases %s, offsets (total %d): %s' % (
                 ''.join(self.significantOffsets.values()),
+                len(self.significantOffsets),
                 ','.join(map(str, self.significantOffsets)))
         else:
             bases = ''
@@ -51,8 +52,13 @@ class AlignedRead(Read):
             self.offset, len(self), bases, self.id)
 
     def __lt__(self, other):
-        t1 = (self.offset, len(self.significantOffsets))
-        t2 = (other.offset, len(other.significantOffsets))
+        """
+        Sort order is according to number of signifcant offsets (decreasing),
+        then the offset where the alignment begins, then the normal
+        C{dark.reads.Read} sort order.
+        """
+        t1 = (-len(self.significantOffsets), self.offset)
+        t2 = (-len(other.significantOffsets), other.offset)
         if t1 == t2:
             return Read.__lt__(self, other)
         else:
