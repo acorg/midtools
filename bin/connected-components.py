@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 
 from itertools import chain
-from data.analysis import ReadAnalysis
+from mid.analysis import ReadAnalysis
 
 
 if __name__ == '__main__':
@@ -15,10 +15,12 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--alignmentFile', metavar='FILENAME', action='append', nargs='+',
+        required=True,
         help='The name of a SAM/BAM alignment file (may be repeated).')
 
     parser.add_argument(
         '--referenceGenome', metavar='FILENAME', action='append', nargs='+',
+        required=True,
         help=('The name of a FASTA file containing reference genomes that '
               'were used to create the alignment files (may be repeated).'))
 

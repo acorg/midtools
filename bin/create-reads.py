@@ -6,22 +6,40 @@ import sys
 from random import uniform, normalvariate
 from math import log10
 
-from dark.reads import Read
-from data.mutate import mutateRead
-
 from dark.reads import (
-    addFASTACommandLineOptions, parseFASTACommandLineOptions)
+    Read, addFASTACommandLineOptions, parseFASTACommandLineOptions)
+
+from mid.mutate import mutateRead
+from mid.utils import s
 
 
-def makeRead(genome, genomeLen, meanLength, sdLength,
-             minReadLength, maxReadLength, id_, rate, circularGenome):
+def makeRead(genome, meanLength, sdLength, minReadLength, maxReadLength,
+             id_, rate, circularGenome):
     """
-    Make a read. Assumes a circular genome!
-    """
-    length = genomeLen + 1
+    Make a read, according to various parameters and constraints regarding its
+    length.
 
-    while (length > genomeLen or length <= 0 or
-           length < minReadLength or length > maxReadLength):
+    Note that when circularGenome is False, reads generated using this method
+    will not in fact have a mean length of C{meanLength}. This is because they
+    are sometimes truncated at the start and end of the genome.
+
+    @param genome: The C{str} genome to base the read on.
+    @param meanLength: The C{float} mean read length.
+    @param sdLength: The C{float} standard deviation of the read lengths.
+    @param minReadLength: The C{int} minimum read length.
+    @param maxReadLength: The C{int} maximum read length.
+    @param id_: The C{str} read id.
+    @param rate: The per-base C{float} mutation rate.
+    @param circularGenome: If C{True}, the genome will be treated as circular.
+        Reads that would otherwise be truncated by running into the end of the
+        genome will continue with bases from the start of the genome.
+    """
+    genomeLen = len(genome)
+    length = -1
+
+    while (0 >= length > genomeLen or
+           length < minReadLength or
+           length > maxReadLength):
         length = int(normalvariate(meanLength, sdLength) + 0.5)
 
     if circularGenome:
@@ -36,12 +54,24 @@ def makeRead(genome, genomeLen, meanLength, sdLength,
 
         assert len(sequence) == length
     else:
-        offset = int(uniform(0.0, genomeLen - length))
-        sequence = genome[offset:offset + length]
-        assert len(sequence) == length
+        # For symmetry, we calculate an offset that allows the read to
+        # overlap (by at least minReadLength bases) with the start or end
+        # of the genome. If that happens, we truncate the read.
+        offset = int(uniform(-(length - 1) + minReadLength,
+                             genomeLen - minReadLength))
+
+        if offset < 0:
+            sequence = genome[:offset + length]
+        else:
+            sequence = genome[offset:offset + length]
+
+    assert maxReadLength >= len(sequence) >= minReadLength, (
+        'maxReadLength=%d, len(sequence)=%d, minReadLength=%d '
+        'readLength=%d offset=%d' %
+        (maxReadLength, len(sequence), minReadLength, length, offset))
 
     read = Read(id_, sequence)
-    mutationOffsets = mutateRead(read, rate)
+    mutationOffsets = () if rate == 0.0 else mutateRead(read, rate)
     return read, offset, mutationOffsets
 
 
@@ -50,7 +80,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description='Mutate reads.')
+        description='Create DNA reads.')
 
     parser.add_argument(
         '--idPrefix', default='read-',
@@ -97,7 +127,8 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--alignReads', action='store_true', default=False,
-        help='If specified, print the reads aligned to the genome.')
+        help=('If specified, print the reads aligned (with "-" characters) '
+              'to the genome.'))
 
     addFASTACommandLineOptions(parser)
     args = parser.parse_args()
@@ -106,7 +137,7 @@ if __name__ == '__main__':
     # reads from.
     assert len(reads) == 1, (
         'FASTA input contained %d sequence%s (expected just one).' % (
-            len(reads), '' if len(reads) == 1 else 's'))
+            len(reads), s(len(reads))))
     genome = reads[0]
     genomeLen = len(genome)
     meanLength = args.meanLength
@@ -131,21 +162,25 @@ if __name__ == '__main__':
     minReadLength = args.minReadLength
 
     if minReadLength <= 0:
-        raise ValueError('The minimum read length must be > 0')
+        raise ValueError('The minimum read length must be positive')
 
     maxReadLength = args.maxReadLength
 
     if maxReadLength is None:
         maxReadLength = genomeLen
     elif maxReadLength <= 0:
-        raise ValueError('The maximum read length must be > 0')
+        raise ValueError('The maximum read length must be positive')
+
+    if minReadLength > maxReadLength:
+        raise ValueError(
+            'The minimum read length cannot exceed the maximum read length')
 
     alignReads = args.alignReads
     circularGenome = args.circularGenome
 
     if circularGenome and alignReads:
-        raise ValueError('You cannot specify both --circularGenome and '
-                         '--alignReads')
+        raise ValueError(
+            'You cannot specify both --circularGenome and --alignReads')
 
     idPrefix = args.idPrefix
     verbose = args.verbose
@@ -159,7 +194,7 @@ if __name__ == '__main__':
     for i in range(args.count):
         id_ = '%s%0*d' % (idPrefix, readCountWidth, i + 1)
         read, offset, mutationOffsets = makeRead(
-            genomeSequence, genomeLen, meanLength, sdLength,
+            genomeSequence, meanLength, sdLength,
             minReadLength, maxReadLength, id_, rate, circularGenome)
 
         read.id = read.id + '-length-%0*d-offset-%0*d' % (

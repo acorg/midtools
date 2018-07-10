@@ -8,7 +8,7 @@ import plotly.graph_objs as go
 from random import uniform
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
 
-from data.data import addCommandLineOptions, parseCommandLineOptions
+from mid.options import addCommandLineOptions, parseCommandLineOptions
 
 
 def plotConsistency(significantOffsets, baseCountAtOffset,
@@ -82,9 +82,9 @@ if __name__ == '__main__':
     addCommandLineOptions(parser, 'consistency-basic.html')
     args = parser.parse_args()
 
-    (genomeLength, alignedReads, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset,
-     significantOffsets) = parseCommandLineOptions(args, True)
+    (genomeLength, alignedReads, paddedSAM, readCountAtOffset,
+     baseCountAtOffset, readsAtOffset, significantOffsets) = (
+         parseCommandLineOptions(args))
 
     print('Read %d aligned reads. Found %d significant locations.' %
           (len(alignedReads), len(significantOffsets)))

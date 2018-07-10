@@ -7,8 +7,9 @@ import plotly.graph_objs as go
 
 from sklearn.metrics import adjusted_rand_score  # , adjusted_mutual_info_score
 
-from data.data import addCommandLineOptions, parseCommandLineOptions
-from data.nid import normalized_information_distance
+from mid.options import addCommandLineOptions, parseCommandLineOptions
+from mid.nid import normalized_information_distance
+from mid.utils import s
 
 
 def zeroScore(_, __):
@@ -31,8 +32,8 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
                 rowText.append(
                     '%d identity (%d read%s)' %
                     (offset1 + 1,
-                        len(readsAtOffset[offset1]),
-                     '' if len(readsAtOffset[offset1]) == 1 else 's'))
+                     len(readsAtOffset[offset1]),
+                     s(len(readsAtOffset[offset1]))))
             else:
                 readsCoveringBoth = (readsAtOffset[offset1] &
                                      readsAtOffset[offset2])
@@ -51,9 +52,9 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
                             '%d (%d read%s) vs %d (%d read%s)<br>Too few (%d) '
                             'reads in common' %
                             (offset2 + 1, len(readsAtOffset[offset2]),
-                             '' if len(readsAtOffset[offset2]) == 1 else 's',
+                             s(len(readsAtOffset[offset2])),
                              offset1 + 1, len(readsAtOffset[offset1]),
-                             '' if len(readsAtOffset[offset1]) == 1 else 's',
+                             s(len(readsAtOffset[offset1])),
                              commonCount))
                     else:
                         bases1 = []
@@ -76,11 +77,11 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
                             '%d (%d read%s) vs %d (%d read%s)<br>%d read%s in '
                             'common' %
                             (offset2 + 1, len(readsAtOffset[offset2]),
-                             '' if len(readsAtOffset[offset2]) == 1 else 's',
+                             s(len(readsAtOffset[offset2])),
                              offset1 + 1, len(readsAtOffset[offset1]),
-                             '' if len(readsAtOffset[offset1]) == 1 else 's',
+                             s(len(readsAtOffset[offset1])),
                              commonCount,
-                             '' if commonCount == 1 else 's'))
+                             s(commonCount)))
                         # print('offset %d vs %d = %.4f (%d)' %
                         # (offset1, offset2, rowScores[-1], commonCount))
                 else:
@@ -135,9 +136,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    (genomeLength, alignedReads, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset,
-     significantOffsets) = parseCommandLineOptions(args, True)
+    (genomeLength, alignedReads, paddedSAM, readCountAtOffset,
+     baseCountAtOffset, readsAtOffset, significantOffsets) = (
+         parseCommandLineOptions(args))
 
     print('Read %d aligned reads of length %d. '
           'Found %d significant offsets.' %

@@ -4,8 +4,10 @@ from os.path import join
 from collections import defaultdict, Counter
 
 from dark.reads import Read
+from dark.fasta import FastaReads
 
-from data.utils import nucleotidesToStr, commonest, fastaIdentityTable
+from mid.utils import (
+    nucleotidesToStr, commonest, fastaIdentityTable, s, commas)
 
 
 def connectedComponentsByOffset(significantReads, threshold):
@@ -60,7 +62,16 @@ class ConsistentComponent(object):
         @param fp: A file pointer to write to.
         """
         for read in sorted(self.reads):
-            print(read.toString(), end='', file=fp)
+            print(read.toString('fasta'), end='', file=fp)
+
+    def savePaddedFasta(self, fp):
+        """
+        Save all reads as FASTA, padded with gaps to preserve alignment.
+
+        @param fp: A file pointer to write to.
+        """
+        for read in sorted(self.reads):
+            print(read.toPaddedString(), end='', file=fp)
 
     def consensusSequence(self, componentOffsets, infoFp):
         """
@@ -106,10 +117,10 @@ class ConsistentComponent(object):
             file=consensusFp, end='')
 
     def summarize(self, fp, count, componentOffsets):
-        plural = '' if len(self.reads) == 1 else 's'
+        plural = s(len(self.reads))
         print('    Consistent component %d: %d read%s, covering %d offset%s' %
               (count, len(self.reads), plural, len(self.nucleotides),
-               '' if len(self.nucleotides) == 1 else 's'), file=fp)
+               s(len(self.nucleotides))), file=fp)
         print('    Nucleotide counts for each offset:', file=fp)
         print(nucleotidesToStr(self.nucleotides, '      '), file=fp)
         print('    Consensus sequence: %s' %
@@ -148,7 +159,7 @@ class ComponentByOffsets(object):
               'consistent sub-components of lengths %s.' % (
                   count, len(self), len(self.offsets),
                   len(self.consistentComponents), ccLengths), file=fp)
-        print('  offsets:', ', '.join(map(str, sorted(self.offsets))), file=fp)
+        print('  offsets:', commas(self.offsets), file=fp)
         for read in sorted(self.reads):
             print('  ', read, file=fp)
 
@@ -164,6 +175,14 @@ class ComponentByOffsets(object):
                       filename)
             with open(filename, 'w') as fp:
                 cc.saveFasta(fp)
+
+            filename = join(outputDir, 'component-%d-%d-padded.fasta' %
+                            (count, i))
+            if verbose > 1:
+                print('      Saving component %d %d padded FASTA to' %
+                      (count, i), filename)
+            with open(filename, 'w') as fp:
+                cc.savePaddedFasta(fp)
 
     def _findConsistentComponents(self):
         """
@@ -260,6 +279,11 @@ class ComponentByOffsets(object):
                   (count, consensusFilename, count, infoFilename))
         with open(consensusFilename, 'w') as consensusFp, open(
                 infoFilename, 'w') as infoFp:
+            # First write the reference sequence for this component.
+            (reference,) = list(
+                FastaReads(join(outputDir,
+                                'reference-component-%d.fasta' % count)))
+            print(reference.toString('fasta'), file=consensusFp, end='')
             for i, cc in enumerate(self.consistentComponents, start=1):
                 cc.saveConsensus(i, self.offsets, consensusFp, infoFp)
 

@@ -99,3 +99,35 @@ def fastaIdentityTable(filename, outputFilename, verbose, filename2=None):
     if verbose > 1:
         for line in e.log:
             print('       ', line)
+
+
+def s(count):
+    """
+    Return an 's' unless a count is singular (i.e., one).
+
+    @param count: The C{int} count.
+    @return: A C{str}, either '' or 's' depending on whether the count is
+        singular.
+    """
+    return '' if count == 1 else 's'
+
+
+def commas(iterable):
+    """
+    Turn an iterable into a sorted comma-separated string.
+
+    @param iterable: An iterable of things to be put into the return string.
+    @return: A sorted comma-separated C{str} of the things in C{iterable}.
+    """
+    return ', '.join(map(str, sorted(iterable)))
+
+
+def alignmentQuality(alignment):
+    """
+    Produce an alignment quality string from a pysam alignment.
+
+    @param alignment: A C{pysam.AlignedSegment} instance.
+    @return: A C{str} quality string.
+    """
+    return ''.join(
+        map(lambda x: chr(x + 33), alignment.query_qualities))

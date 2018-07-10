@@ -6,17 +6,8 @@ import sys
 from collections import Counter
 from math import log10
 
-from data.data import addCommandLineOptions, parseCommandLineOptions
-
-
-def baseCountsToStr(counts):
-    """
-    @param counts: A C{counter} instance.
-    """
-    total = sum(counts.values())
-    return ', '.join([
-        ('%s %d (%.2f%%)' % (base, counts[base], counts[base] / total * 100.0))
-        for base in sorted(counts)])
+from mid.options import addCommandLineOptions, parseCommandLineOptions
+from mid.utils import baseCountsToStr
 
 
 if __name__ == '__main__':
@@ -26,7 +17,7 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description='Analyze a set of aligned reads.')
 
-    addCommandLineOptions(parser, 'significant-base-frequencies.html')
+    addCommandLineOptions(parser)
 
     parser.add_argument(
         '--verbose', action='store_true', default=False,
@@ -34,8 +25,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    (genomeLength, alignedReads, readCountAtLocation, baseCountAtLocation,
-     readsAtLocation, _) = parseCommandLineOptions(args, False)
+    (genomeLength, alignedReads, paddedSAM, readCountAtOffset,
+     baseCountAtOffset, readsAtOffset, _) = parseCommandLineOptions(
+         args, False)
 
     print('Read %d aligned reads.' % len(alignedReads), file=sys.stderr)
 
@@ -44,7 +36,7 @@ if __name__ == '__main__':
 
     for offset in range(genomeLength):
         counts = Counter()
-        for read in readsAtLocation[offset]:
+        for read in readsAtOffset[offset]:
             base = read.base(offset)
             if base in nucleotides:
                 counts[base] += 1

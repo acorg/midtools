@@ -3,7 +3,8 @@
 from __future__ import print_function
 import sys
 
-from data.mutate import mutateRead
+from mid.mutate import mutateRead
+from mid.utils import s
 
 from dark.reads import (
     addFASTACommandLineOptions, parseFASTACommandLineOptions)
@@ -25,16 +26,30 @@ if __name__ == '__main__':
         help=('Print (to stderr) the number of mutations made to each '
               'sequence.'))
 
+    parser.add_argument(
+        '--idSuffix', default='',
+        help=('Add this string to the end of the read ids. This is added '
+              'after the string added by --editIds (if also used).'))
+
+    parser.add_argument(
+        '--editIds', action='store_true', default=False,
+        help=('Add "-mutations:N" to the end of each read id, where N '
+              'is the number of mutations introduced to the read.'))
+
     addFASTACommandLineOptions(parser)
     args = parser.parse_args()
     reads = parseFASTACommandLineOptions(args)
     rate = args.rate
     verbose = args.verbose
+    editIds = args.editIds
+    idSuffix = args.idSuffix
 
     for read in reads:
         count = len(mutateRead(read, rate))
         if verbose:
             print('%d mutation%s made in read (len %d) %s' % (
-                count, '' if count == 1 else 's', len(read), read.id),
-                  file=sys.stderr)
+                count, s(count), len(read), read.id), file=sys.stderr)
+        read.id = (read.id +
+                   (('-mutations:%d' % count) if editIds else '') +
+                   idSuffix)
         print(read.toString('fasta'), end='')

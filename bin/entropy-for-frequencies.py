@@ -12,7 +12,7 @@ $ entropy.py 12 4 5
 """
 
 import sys
-from data.entropy import entropy2
+from mid.entropy import entropy2
 
 if len(sys.argv) < 2:
     print('Usage: %s freq1 [freq2 ...]' % sys.argv[0], file=sys.stderr)

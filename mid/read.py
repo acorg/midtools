@@ -7,11 +7,15 @@ class AlignedRead(Read):
     """
     Hold information about a read that has been aligned to a consensus.
 
-    @param read: A C{dark.reads.Read} instance.
+    @param id_: A C{str} sequence id.
+    @param sequence: A gap-padded C{str} aligned sequence (as returned by
+        C{dark.sam.PaddedSAM.queries}).
+    @param alignment: An optional C{pysam.AlignedSegment} instance.
     """
-    def __init__(self, id_, sequence):
+    def __init__(self, id_, sequence, alignment=None):
         self.significantOffsets = OrderedDict()
         self._originalLength = len(sequence)
+        self.alignment = alignment
 
         # Scan the sequence for initial gaps.
         offset = 0
@@ -36,8 +40,8 @@ class AlignedRead(Read):
         assert offset + trailing < len(sequence)
         self.offset = offset
 
-        Read.__init__(
-            self, id_, sequence[offset:len(sequence) - trailing].upper())
+        Read.__init__(self, id_,
+                      sequence[offset:len(sequence) - trailing].upper())
 
     def __str__(self):
         if self.significantOffsets:
@@ -132,7 +136,7 @@ class AlignedRead(Read):
         else:
             return False
 
-    def toString(self):
+    def toPaddedString(self):
         """
         Make a FASTA string for the read, including its original gaps.
         """
