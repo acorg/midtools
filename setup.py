@@ -38,7 +38,7 @@ setup(name='midtools',
           'Operating System :: OS Independent',
           'Topic :: Software Development :: Libraries :: Python Modules',
       ],
-      description=('Command line scripts and Python class for detecting '
+      description=('Command line scripts and Python classes for detecting '
                    'multiple infections from NGS reads.'),
       long_description='See https://github.com/acorg/midtools for details.',
       license='MIT',

@@ -9,7 +9,10 @@ tcheck:
 	trial --rterrors test
 
 clean:
-	rm -fr _trial_temp
+	rm -fr _trial_temp dist midtools.egg-info
+	find . -name '*.pyc' -print0 | $(XARGS) -0 rm
+	find . -name '*~' -print0 | $(XARGS) -0 rm
+	make -C simulations clean
 
 flake8:
 	find midtools bin -name '*.py' -print0 | $(XARGS) -0 flake8

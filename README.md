@@ -25,6 +25,10 @@ install at least
 * [Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml). Make
   sure you get version 2, not version 1.
 
+To run the simulations you'll need to locally clone this repo (`pip
+install` doesn't get you the `simulations` directory).
+
+----
 
 Below are some rough high-level notes.
 
