@@ -9,8 +9,8 @@ from math import log10
 from dark.reads import (
     Read, addFASTACommandLineOptions, parseFASTACommandLineOptions)
 
-from mid.mutate import mutateRead
-from mid.utils import s
+from midtools.mutate import mutateRead
+from midtools.utils import s
 
 
 def makeRead(genome, meanLength, sdLength, minReadLength, maxReadLength,

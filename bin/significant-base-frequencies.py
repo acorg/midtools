@@ -4,8 +4,8 @@ from __future__ import division, print_function
 
 import sys
 
-from mid.options import addCommandLineOptions, parseCommandLineOptions
-from mid.plotting import plotBaseFrequencies
+from midtools.options import addCommandLineOptions, parseCommandLineOptions
+from midtools.plotting import plotBaseFrequencies
 
 
 if __name__ == '__main__':

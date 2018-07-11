@@ -1,7 +1,7 @@
 from dark.sam import PaddedSAM
 
-from mid.data import gatherData, findSignificantOffsets
-from mid.read import AlignedRead
+from midtools.data import gatherData, findSignificantOffsets
+from midtools.read import AlignedRead
 
 
 def addCommandLineOptions(parser, outfileDefaultName=None):

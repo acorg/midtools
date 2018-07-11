@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from data.data import AlignedRead
+from midtools.read import AlignedRead
 
 
 class TestAlignedRead(TestCase):

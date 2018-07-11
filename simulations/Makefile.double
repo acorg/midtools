@@ -1,0 +1,188 @@
+############################## Rules
+%.bam : %.sam
+	samtools view -b < $< | samtools sort - > $@
+	samtools index $@
+
+%.stats: %.sam
+	sam-reference-read-counts.py $< > $@
+
+BIN := ../../bin
+BOWTIE2_DB_DIR := bowtie2-db
+BOWTIE2_SAM_DIR := bowtie2-sam
+CC_OUT := cc-1.out
+
+MID_CONSENSUS := $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.sam
+MID_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(MID_CONSENSUS))
+
+all: \
+    dirs \
+    $(BOWTIE2_DB_DIR)/genome-1-db.1.bt2 \
+    $(BOWTIE2_DB_DIR)/genome-2-db.1.bt2 \
+    $(BOWTIE2_DB_DIR)/genome-12-db.1.bt2 \
+    $(BOWTIE2_SAM_DIR)/reads-1-genome-1-bowtie2.sam \
+    $(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.sam \
+    $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam \
+    $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam \
+    $(BOWTIE2_SAM_DIR)/reads-1-genome-1-bowtie2.stats \
+    $(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.stats \
+    $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.stats \
+    $(MID_CONSENSUS) \
+    reads-1-genome-1-coverage-and-significant-locations.html \
+    reads-2-genome-2-coverage-and-significant-locations.html \
+    reads-12-genome-12-coverage-and-significant-locations.html \
+    consensus-reads-12-genome-1-samtools.fasta \
+    consensus-reads-12-genome-2-samtools.fasta \
+    consensus-reads-12-genome-1-samtools-on-mid.fasta \
+    consensus-12-identity.html \
+    reads-12-genome-12-significant-base-frequencies-bowtie2.html \
+    reads-12-genome-12-significant-base-frequencies-mid.html \
+    reads-12-genome-12-significant-base-frequencies-sorted-bowtie2.html \
+    reads-12-genome-12-significant-base-frequencies-sorted-mid.html
+
+dirs:
+	test -d $(BOWTIE2_DB_DIR) || mkdir $(BOWTIE2_DB_DIR)
+	test -d $(BOWTIE2_SAM_DIR) || mkdir $(BOWTIE2_SAM_DIR)
+
+############################## Genomes and reads
+genome-1.fasta:
+	$(BIN)/create-mid-experiment-data.py \
+            --out . \
+            --genomeLength $(GENOME_LENGTH) \
+            --genome2MutationRate $(GENOME_2_MUTATION_RATE) \
+            --meanReadLength $(MEAN_LENGTH) \
+            --sdReadLength $(SD_LENGTH) \
+            --readMutationRate $(READ_MUTATION_RATE) \
+            --readCount $(READ_COUNT) \
+            --force
+
+genome-12.fasta: genome-1.fasta
+	cat genome-1.fasta genome-2.fasta > genome-12.fasta
+
+############################## Bowtie2 databases.
+$(BOWTIE2_DB_DIR)/genome-1-db.1.bt2: genome-1.fasta
+	bowtie2-build -f --quiet $< $(BOWTIE2_DB_DIR)/genome-1-db
+
+$(BOWTIE2_DB_DIR)/genome-2-db.1.bt2: genome-2.fasta
+	bowtie2-build -f --quiet $< $(BOWTIE2_DB_DIR)/genome-2-db
+
+$(BOWTIE2_DB_DIR)/genome-12-db.1.bt2: genome-1.fasta genome-2.fasta
+	bowtie2-build -f --quiet genome-1.fasta,genome-2.fasta $(BOWTIE2_DB_DIR)/genome-12-db
+
+############################## Bowtie2 SAM files.
+$(BOWTIE2_SAM_DIR)/reads-1-genome-1-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-1-db.1.bt2 reads-1.fasta
+	bowtie2 --quiet --local --xeq --all -U reads-1.fasta -f -x $(BOWTIE2_DB_DIR)/genome-1-db -S $@
+
+$(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-2-db.1.bt2 reads-2.fasta
+	bowtie2 --quiet --local --xeq --all -U reads-2.fasta -f -x $(BOWTIE2_DB_DIR)/genome-2-db -S $@
+
+$(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-12-db.1.bt2 reads-12.fasta
+	bowtie2 --quiet --local --xeq --all -U reads-12.fasta -f -x $(BOWTIE2_DB_DIR)/genome-12-db -S $@
+
+#################### Coverage and significant locations plots
+CSL_ARGS := --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) --minReads $(MIN_READS)
+
+CSL_SCRIPT := $(BIN)/coverage-and-significant-locations.py
+
+reads-12-genome-12-coverage-and-significant-locations.html: $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam
+	 $(CSL_SCRIPT) --outFile $@ $(CSL_ARGS) --referenceId genome-1 --samFile $<
+
+reads-1-genome-1-coverage-and-significant-locations.html: $(BOWTIE2_SAM_DIR)/reads-1-genome-1-bowtie2.sam
+	$(CSL_SCRIPT) --outFile $@ $(CSL_ARGS) --referenceId genome-1 --samFile $<
+
+reads-2-genome-2-coverage-and-significant-locations.html: $(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.sam
+	$(CSL_SCRIPT) --outFile $@ $(CSL_ARGS) --referenceId genome-2 --samFile $<
+
+############################## MID connected component analysis
+AGREEMENT_THRESHOLD := 0.55
+
+$(MID_CONSENSUS): $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam genome-1.fasta
+	$(BIN)/connected-components.py \
+            --alignmentFile $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam \
+            --outputDir $(CC_OUT) \
+            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
+            --minReads $(MIN_READS) \
+            --agreementThreshold $(AGREEMENT_THRESHOLD) \
+            --referenceGenome genome-1.fasta \
+            --verbose 2 > cc-1.stdout
+	rm -f component-1-consensuses-identity.html
+	ln -s $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/component-1-consensuses-identity.html
+
+
+############################## Consensus sequences built with bcftools
+consensus-reads-12-genome-1-samtools.fasta: genome-12.fasta $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam
+	samtools mpileup -u -f genome-12.fasta $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam | \
+            bcftools call -c | vcfutils.pl vcf2fq | \
+            filter-fasta.py --fastq --titleRegex genome-1 \
+                --idLambda 'lambda _: "consensus-1-samtools"' \
+                --saveAs fasta --quiet > $@
+
+consensus-reads-12-genome-2-samtools.fasta: genome-12.fasta $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam
+	samtools mpileup -u -f genome-12.fasta $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam | \
+            bcftools call -c | vcfutils.pl vcf2fq | \
+            filter-fasta.py --fastq --titleRegex genome-2 \
+                --idLambda 'lambda _: "consensus-2-samtools"' \
+                --saveAs fasta --quiet > $@
+
+consensus-reads-12-genome-1-samtools-on-mid.fasta: genome-1.fasta $(MID_CONSENSUS_BAM)
+	samtools mpileup -u -f genome-1.fasta $(MID_CONSENSUS_BAM) | \
+            bcftools call -c | vcfutils.pl vcf2fq | \
+            filter-fasta.py --fastq --idLambda 'lambda _: "consensus-12-samtools-on-mid"' \
+                --saveAs fasta --quiet > $@
+
+############################## Significant base frequency plots
+SBF_ARGS := \
+    $(HOMOGENEOUS_CUTOFF) \
+    $(MIN_READS) \
+    $(GENOME_2_MUTATION_RATE) \
+    $(GENOME_LENGTH) \
+    $(READ_COUNT) \
+    $(MEAN_LENGTH) \
+    $(SD_LENGTH) \
+    $(READ_MUTATION_RATE)
+
+SBF_SCRIPT := $(BIN)/simulation-significant-base-frequencies.sh
+
+reads-12-genome-12-significant-base-frequencies-bowtie2.html: $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam
+	$(SBF_SCRIPT) $(SBF_ARGS) $@ $< samtools ''
+
+reads-12-genome-12-significant-base-frequencies-sorted-bowtie2.html: $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam
+	$(SBF_SCRIPT) $(SBF_ARGS) $@ $< samtools '--sortOn max'
+
+reads-12-genome-12-significant-base-frequencies-mid.html: $(MID_CONSENSUS)
+	$(SBF_SCRIPT) $(SBF_ARGS) $@ $< MID ''
+
+reads-12-genome-12-significant-base-frequencies-sorted-mid.html: $(MID_CONSENSUS)
+	$(SBF_SCRIPT) $(SBF_ARGS) $@ $< MID '--sortOn max'
+
+############################## FASTA identity table of all consensuses to genome 1
+
+# The order of files below will be the order they appear in the HTML table.
+CONSENSUS_FASTA := \
+    genome-1.fasta \
+    consensus-reads-12-genome-1-samtools.fasta \
+    $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.fasta \
+    consensus-reads-12-genome-1-samtools-on-mid.fasta \
+    genome-2.fasta \
+    consensus-reads-12-genome-2-samtools.fasta \
+    $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/non-reference-consensus.fasta
+
+COLOR := \
+    --color '0.65 rgb(247,252,240)' \
+    --color '0.70 rgb(224,243,219)' \
+    --color '0.75 rgb(204,235,197)' \
+    --color '0.80 rgb(168,221,181)' \
+    --color '0.85 rgb(123,204,196)' \
+    --color '0.90 rgb(78,179,211)' \
+    --color '0.95 rgb(43,140,190)'
+
+consensus-12-identity.html: $(CONSENSUS_FASTA)
+	cat $(CONSENSUS_FASTA) > consensuses.fasta
+	fasta-identity-table.py --showGaps --showLengths --footer --removeDescriptions \
+            $(COLOR) < consensuses.fasta > $@
+
+############################## Misc
+clean:
+	rm -f *~
+	rm -f genome-* LOG
+	rm -f *.{sam,bam,fai,fasta,html,stdout}
+	rm -fr $(CC_OUT) $(BOWTIE2_DB_DIR) $(BOWTIE2_SAM_DIR)

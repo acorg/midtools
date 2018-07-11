@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 
 from itertools import chain
-from mid.analysis import ReadAnalysis
+from midtools.analysis import ReadAnalysis
 
 
 if __name__ == '__main__':

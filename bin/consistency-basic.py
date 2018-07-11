@@ -8,7 +8,7 @@ import plotly.graph_objs as go
 from random import uniform
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
 
-from mid.options import addCommandLineOptions, parseCommandLineOptions
+from midtools.options import addCommandLineOptions, parseCommandLineOptions
 
 
 def plotConsistency(significantOffsets, baseCountAtOffset,

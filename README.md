@@ -1,3 +1,33 @@
+Here are some tools for trying to detect multiple infection in samples (as
+represented by NGS reads) and trying to extract the (consensus) infecting
+genomes.  This code is not a finished product that you can just run on a
+FASTQ file and get an answer. Rather it's a set of tools that can be used
+in such an investigation.
+
+The problem is quite complicated and this is very much research-level code
+(e.g., there's a total lack of tests for the code in `midtools/analysis.py`
+and `midtools/component.py`), which I find quite disturbing :-(
+
+There are some simple controlled experiments in `simulations` that are
+designed to compare these tools with what you get from
+[bcftools](https://github.com/samtools/bcftools) or (I hope, someday soon)
+others.
+
+# Pre-requisites
+
+To run this code (or at least to run the simulations), you'll need to
+install at least
+
+* [midtools](https://github.com/acorg/midtools/). This is the code you are
+  looking at right now.  The easiest way to install it is via `pip install
+  midtools`.
+* [samtools](http://www.htslib.org/)
+* [Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml). Make
+  sure you get version 2, not version 1.
+
+
+Below are some rough high-level notes.
+
 # Terminology
 
 * Reference - a genome that reads are aligned to.
@@ -13,7 +43,8 @@
 What assumptions are you making?
 
 * In simulations, you're making independent reads from a single genome. So
-  SNPs are completely uncorrelated. Won't be like that in a real infection.
+  SNPs are completely uncorrelated. It won't be like that in a real
+  infection.
 
 # Single infections
 
@@ -42,18 +73,18 @@ What assumptions are you making?
 1. Given two references, should be able to extract two consensuses.
 
 1. Given a mixed infection (of genetically similar viruses) but only one
-   reference genome, should be able to extract a consensus based on and
-   alignment to the reference but also a second consensus corresponding to
-   the unknown genome.
+   reference genome, should be able to extract a first consensus based on
+   and alignment to the reference but also a second consensus (hopefully)
+   corresponding to the unknown genome.
 
 1. Why can't an algorithm like BWA or BLAST do this already? What are we
    adding? The subtraction of reads that don't match the consensus of the
-   reads that do match.  It's not the same as throwing away reads that
-   don't match the reference - that would be relatively easy, you'd just
-   make the matcher more strict.
+   reads that do match (and then putting them together).  It's not the same
+   as throwing away reads that don't match the reference - that would be
+   relatively easy: just make the matcher more strict.
 
-1. There is some ratio of virions from one virus to virions from the
-   other. This is eventually reflected in some ratio of reads from one or
+1. There is some ratio of virions from one virus to virions from the other.
+   This is eventually reflected in some ratio of reads from one virus or
    the other. The two viruses may be very similar (or identical) in parts
    and different in others. For the identical regions it may not be
    possible (and of course it doesn't matter) to tell which virus a read
@@ -68,10 +99,15 @@ location.
 
 ## connected-components.py
 
-Finds reads that agree with one another at a set of significant genome
-locations, makes a graph with reads as nodes and edges between reads that
-agree with one another, then finds the connected components of that graph.
-The idea is to split the reads into mutually-supporting groups.
+Find reads that agree with one another at a set of significant genome
+locations, makes (essentially) a graph with reads as nodes and edges
+between reads that agree with one another, then finds the connected
+components of that graph.  The idea is to split the reads into
+mutually-consistent groups. Then find the consistent groups and put them
+together (guided by the reference). The consistent groups that were not
+chosen can be used to make a second (or more) consensus genome.
+
+The above is a very poor description, needs updating!
 
 ## consistency-basic.py
 
@@ -94,13 +130,13 @@ Also not very informative.
 Produces two simple plots. Read coverage level across the genome and the
 position of the significant locations.
 
+## create-mid-experiment-data.py
+
+Creates data files used in the simulations.
+
 ## create-reads.py
 
 Create reads, sampled from a given genome, optionally aligned and mutated.
-
-## entropy-for-frequencies.py
-
-Given a list of label frequencies, print their entropies.
 
 ## multiple-significant-base-frequencies.py
 
@@ -123,3 +159,13 @@ location. This looks like a stacked bar chart. It shows sorted base
 frequencies, not the actual bases. The idea is to be able to look to see if
 there are many locations that have more than one base present in
 significant numbers.
+
+## multiple-significant-base-frequencies.py
+
+As above, but plots the result of multiple runs of
+`significant-base-frequencies.py` using its `--valuesFile` option to save
+calculated values.
+
+## random-nt-sequence.py
+
+Print a random sequence of nucleotides.

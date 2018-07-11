@@ -1,3 +1,13 @@
-*.html
+*.pyc
+*~
 __pycache__
 .pytest_cache
+simulations/**/*.sam
+simulations/**/*.html
+simulations/**/*.fasta
+simulations/**/*.fai
+simulations/**/*.out
+simulations/**/*.stdout
+simulations/**/*.bt2
+simulations/**/LOG
+simulations/**/bowtie2-sam

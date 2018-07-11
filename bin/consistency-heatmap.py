@@ -7,9 +7,9 @@ import plotly.graph_objs as go
 
 from sklearn.metrics import adjusted_rand_score  # , adjusted_mutual_info_score
 
-from mid.options import addCommandLineOptions, parseCommandLineOptions
-from mid.nid import normalized_information_distance
-from mid.utils import s
+from midtools.options import addCommandLineOptions, parseCommandLineOptions
+from midtools.nid import normalized_information_distance
+from midtools.utils import s
 
 
 def zeroScore(_, __):

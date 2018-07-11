@@ -4,8 +4,8 @@ import plotly.graph_objs as go
 from operator import itemgetter
 from json import dump
 
-from mid.entropy import entropy2, MAX_ENTROPY
-from mid.utils import s
+from midtools.entropy import entropy2, MAX_ENTROPY
+from midtools.utils import s
 
 
 def _plotSortedMaxBaseFrequencies(

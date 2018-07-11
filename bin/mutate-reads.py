@@ -3,8 +3,8 @@
 from __future__ import print_function
 import sys
 
-from mid.mutate import mutateRead
-from mid.utils import s
+from midtools.mutate import mutateRead
+from midtools.utils import s
 
 from dark.reads import (
     addFASTACommandLineOptions, parseFASTACommandLineOptions)

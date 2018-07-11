@@ -2,8 +2,8 @@
 
 from __future__ import division, print_function
 
-from mid.options import addCommandLineOptions, parseCommandLineOptions
-from mid.plotting import plotCoverageAndSignificantLocations
+from midtools.options import addCommandLineOptions, parseCommandLineOptions
+from midtools.plotting import plotCoverageAndSignificantLocations
 
 
 if __name__ == '__main__':

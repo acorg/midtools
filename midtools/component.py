@@ -6,7 +6,7 @@ from collections import defaultdict, Counter
 from dark.reads import Read
 from dark.fasta import FastaReads
 
-from mid.utils import (
+from midtools.utils import (
     nucleotidesToStr, commonest, fastaIdentityTable, s, commas)
 
 

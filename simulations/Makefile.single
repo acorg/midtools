@@ -1,0 +1,27 @@
+all: plot.html
+
+genome.fasta:
+	echo '>id' > $@
+	../bin/random-nt-sequence.py $(GENOME_LENGTH) >> $@
+
+reads.fasta: genome.fasta
+	create-reads.py \
+            --count $(READ_COUNT) \
+            --meanLength $(MEAN_LENGTH) \
+            --sdLength $(SD_LENGTH) \
+            --rate $(READ_MUTATION_RATE) < $< > $@
+
+genome-db.1.bt2: genome.fasta
+	bowtie2-build -f --quiet genome.fasta genome-db
+
+genome-bowtie2.sam: genome-db.1.bt2 reads.fasta
+	bowtie2 --quiet --local --xeq --all -U reads.fasta -f -x genome-db -S $@
+
+plot.html: genome-bowtie2.sam
+	significant-base-frequencies.py \
+            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) --minReads $(MIN_READS) \
+            --title 'Single infection<br>Virus genome $(GENOME_LENGTH) nt, $(READ_COUNT) reads (mean length $(MEAN_LENGTH), sd $(SD_LENGTH)), $(READ_MUTATION_RATE) read mutation rate.' \
+            --outFile $@ --samFile $<
+
+clean:
+	rm -f *~ genome-db* genome-bowtie2* *.fasta *.html

@@ -19,15 +19,15 @@ from dark.process import Executor
 from dark.reads import Read, Reads
 from dark.sam import PaddedSAM, samfile
 
-from mid.component import connectedComponentsByOffset
-from mid.data import gatherData, findSignificantOffsets
-from mid.plotting import (
+from midtools.component import connectedComponentsByOffset
+from midtools.data import gatherData, findSignificantOffsets
+from midtools.plotting import (
     plotBaseFrequencies, plotCoverageAndSignificantLocations)
-from mid.read import AlignedRead
-from mid.utils import (
+from midtools.read import AlignedRead
+from midtools.utils import (
     baseCountsToStr, nucleotidesToStr, commonest, fastaIdentityTable, s,
     alignmentQuality, commas)
-from mid.match import matchToString
+from midtools.match import matchToString
 
 
 class ReadAnalysis(object):

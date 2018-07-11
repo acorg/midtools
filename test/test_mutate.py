@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from dark.reads import Read
 
-from data.mutate import mutateRead
+from midtools.mutate import mutateRead
 
 
 class TestMutateRead(TestCase):

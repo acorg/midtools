@@ -6,8 +6,8 @@ import sys
 from collections import Counter
 from math import log10
 
-from mid.options import addCommandLineOptions, parseCommandLineOptions
-from mid.utils import baseCountsToStr
+from midtools.options import addCommandLineOptions, parseCommandLineOptions
+from midtools.utils import baseCountsToStr
 
 
 if __name__ == '__main__':
