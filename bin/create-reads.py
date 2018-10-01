@@ -117,6 +117,15 @@ if __name__ == '__main__':
         help='Print (to stderr) information about the created reads.')
 
     parser.add_argument(
+        '--fastaReads', action='store_true', default=False,
+        help='Make the reads be FASTA instead of FASTQ')
+
+    parser.add_argument(
+        '--qualityChar', default='I',
+        help=('The quality character to use for all quality scores when '
+              '--fastq is used'))
+
+    parser.add_argument(
         '--circularGenome', action='store_true', default=False,
         help=('If specified, reads will wrap around the genome (currently not '
               'compatible with --alignReads).'))
@@ -191,6 +200,9 @@ if __name__ == '__main__':
     if args.printGenome:
         print(genome.toString('fasta'), end='')
 
+    fastq, format_ = (False, 'fasta') if args.fastaReads else (True, 'fastq')
+    qualityChar = args.qualityChar
+
     for i in range(args.count):
         id_ = '%s%0*d' % (idPrefix, readCountWidth, i + 1)
         read, offset, mutationOffsets = makeRead(
@@ -217,4 +229,7 @@ if __name__ == '__main__':
                 sequence += '-' * (genomeLen - len(sequence))
             read.sequence = sequence[:genomeLen]
 
-        print(read.toString('fasta'), end='')
+        if fastq:
+            read.quality = qualityChar * len(read.sequence)
+
+        print(read.toString(format_), end='')

@@ -3,10 +3,14 @@ midtools.egg-info
 *.pyc
 *~
 __pycache__
+_trial_temp
 .pytest_cache
 simulations/**/*.sam
+simulations/**/*.bam
+simulations/**/*.bai
 simulations/**/*.html
 simulations/**/*.fasta
+simulations/**/*.fastq
 simulations/**/*.fai
 simulations/**/*.out
 simulations/**/*.stdout

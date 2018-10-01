@@ -67,7 +67,7 @@ if __name__ == '__main__':
           (len(alignedReads), genomeLength, len(significantOffsets)))
 
     plotBaseFrequencies(
-        significantOffsets, baseCountAtOffset, readCountAtOffset, args.outFile,
+        significantOffsets, baseCountAtOffset, readCountAtOffset, args.outfile,
         valuesFile=args.valuesFile, title=args.title,
         sampleName=args.sampleName, minReads=args.minReads,
         homogeneousCutoff=args.homogeneousCutoff, sortOn=args.sortOn,

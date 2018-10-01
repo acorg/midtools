@@ -1,29 +1,15 @@
-from dark.sam import PaddedSAM
+from dark.sam import SAMFilter, PaddedSAM
 
 from midtools.data import gatherData, findSignificantOffsets
 from midtools.read import AlignedRead
 
 
-def addCommandLineOptions(parser, outfileDefaultName=None):
+def addCommonOptions(parser):
     """
     Add standard command-line options to an argument parser.
 
     @param parser: An C{ArgumentParser} instance.
-    @param outfileDefaultName: The C{str} output file to use as a default
-        in case the user does not give one on the command line.
     """
-    parser.add_argument(
-        '--samFile', metavar='FILENAME', required=True,
-        help='The name of the SAM/BAM input file.')
-
-    parser.add_argument(
-        '--referenceId', metavar='SEQUENCE-ID',
-        help='The id of the reference to use in the SAM/BAM input file.')
-
-    parser.add_argument(
-        '--outFile', default=outfileDefaultName,
-        help='The filename to store the resulting HTML.')
-
     parser.add_argument(
         '--minReads', type=int, default=5,
         help=('The minimum number of reads that must cover a location for it '
@@ -35,6 +21,23 @@ def addCommandLineOptions(parser, outfileDefaultName=None):
               'this fraction of the time (i.e., amongst all reads that cover '
               'the location) then the locaion will be considered homogeneous '
               'and therefore uninteresting.'))
+
+
+def addCommandLineOptions(parser, outfileDefaultName=None):
+    """
+    Add standard command-line options to an argument parser.
+
+    @param parser: An C{ArgumentParser} instance.
+    @param outfileDefaultName: The C{str} output file to use as a default
+        in case the user does not give one on the command line.
+    """
+
+    addCommonOptions(parser)
+    SAMFilter.addFilteringOptions(parser)
+
+    parser.add_argument(
+        '--outfile', default=outfileDefaultName,
+        help='The filename to store the resulting HTML.')
 
     parser.add_argument(
         '--show', action='store_true', default=False,
@@ -58,37 +61,25 @@ def parseCommandLineOptions(args, returnSignificantOffsets=True):
     """
     genomeLength = None
     alignedReads = []
-    paddedSAM = PaddedSAM(args.samFile)
-    sam = paddedSAM.samfile
+    samFilter = SAMFilter.parseFilteringOptions(args)
 
-    referenceId = args.referenceId
+    if samFilter.referenceIds and len(samFilter.referenceIds) > 1:
+        raise ValueError('Only one reference id can be given.')
 
-    if referenceId:
-        # Make sure the reference id is present in the SAM file.
-        tid = sam.get_tid(referenceId)
-        if tid == -1:
-            raise ValueError('Reference %s not in %s alignment file.' %
-                             (referenceId, args.samFile))
-        else:
-            genomeLength = sam.lengths[tid]
+    referenceLengths = samFilter.referenceLengths()
+
+    if len(referenceLengths) == 1:
+        referenceId, genomeLength = referenceLengths.popitem()
     else:
-        # If there is just one reference, use it. Otherwise exit.
-        if sam.nreferences == 1:
-            referenceId = sam.references[0]
-        else:
-            # The error message will finish with ' ().' if for some reason
-            # the SAM file has zero references. But that probably cannot
-            # happen so I'm not worrying about it.
-            raise ValueError(
-                'If you do not specify a reference sequence with '
-                '--referenceId, the SAM/BAM file must contain exactly one '
-                'reference. But %s contains %d (%s).' %
-                (args.samFile, sam.nreferences,
-                 ', '.join(sorted(sam.references))))
+        raise ValueError(
+            'If you do not specify a reference sequence with '
+            '--referenceId, the SAM/BAM file must contain exactly one '
+            'reference. But %s contains %d (%s).' %
+            (args.samfile, len(referenceLengths)))
 
-    for query in paddedSAM.queries(referenceName=referenceId):
-        if genomeLength is None:
-            genomeLength = len(query)
+    paddedSAM = PaddedSAM(samFilter)
+
+    for query in paddedSAM.queries():
         alignedReads.append(AlignedRead(query.id, query.sequence))
 
     readCountAtOffset, baseCountAtOffset, readsAtOffset = gatherData(
@@ -105,3 +96,50 @@ def parseCommandLineOptions(args, returnSignificantOffsets=True):
 
     return (genomeLength, alignedReads, paddedSAM, readCountAtOffset,
             baseCountAtOffset, readsAtOffset, significantOffsets)
+
+
+def addAnalysisCommandLineOptions(parser):
+    """
+    Add command-line options used in a read analysis.
+    """
+
+    addCommonOptions(parser)
+
+    parser.add_argument(
+        '--referenceGenome', metavar='FILENAME', action='append', nargs='+',
+        required=True,
+        help=('The name of a FASTA file containing reference genomes that '
+              'were used to create the alignment files (may be repeated).'))
+
+    parser.add_argument(
+        '--alignmentFile', metavar='FILENAME', action='append', nargs='+',
+        required=True,
+        help='The name of a SAM/BAM alignment file (may be repeated).')
+
+    parser.add_argument(
+        '--referenceId', metavar='NAME', action='append', nargs='*',
+        help=('The sequence id whose alignment should be analyzed (may '
+              'be repeated). All ids must be present in --referenceGenome '
+              'file. One of the SAM/BAM files given using --alignmentFile '
+              'should have an alignment against the given argument. If '
+              'omitted, all references that are aligned to in the given '
+              'BAM/SAM files will be analyzed.'))
+
+    parser.add_argument(
+        '--outputDir',
+        help='The directory to save result files to.')
+
+    parser.add_argument(
+        '--saveReducedFASTA', default=False, action='store_true',
+        help=('If given, write out a FASTA file of the original input but '
+              'with just the signifcant locations.'))
+
+    parser.add_argument(
+        '--plotSAM', default=False, action='store_true',
+        help=('If given, save plots showing where reads are aligned to on '
+              'the genome along with their alignment scores.'))
+
+    parser.add_argument(
+        '--verbose', type=int, default=0,
+        help=('The integer verbosity level (0 = no output, 1 = some output, '
+              'etc).'))

@@ -1,18 +1,17 @@
-############################## Rules
-%.bam : %.sam
-	samtools view -b < $< | samtools sort - > $@
-	samtools index $@
-
-%.stats: %.sam
-	sam-reference-read-counts.py $< > $@
-
-BIN := ../../bin
 BOWTIE2_DB_DIR := bowtie2-db
 BOWTIE2_SAM_DIR := bowtie2-sam
-CC_OUT := cc-1.out
 
 MID_CONSENSUS := $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.sam
 MID_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(MID_CONSENSUS))
+
+GREADY_CONSENSUS := $(GREADY_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.sam
+GREADY_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(GREADY_CONSENSUS))
+
+GREADY_NON_CONSENSUS := $(GREADY_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-non-consensus.sam
+GREADY_NON_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(GREADY_NON_CONSENSUS))
+
+CLUSTER_CONSENSUS := $(CLUSTER_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.sam
+CLUSTER_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(CLUSTER_CONSENSUS))
 
 all: \
     dirs \
@@ -27,12 +26,16 @@ all: \
     $(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.stats \
     $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.stats \
     $(MID_CONSENSUS) \
+    $(GREADY_CONSENSUS) \
+    $(CLUSTER_CONSENSUS) \
     reads-1-genome-1-coverage-and-significant-locations.html \
     reads-2-genome-2-coverage-and-significant-locations.html \
     reads-12-genome-12-coverage-and-significant-locations.html \
     consensus-reads-12-genome-1-samtools.fasta \
     consensus-reads-12-genome-2-samtools.fasta \
     consensus-reads-12-genome-1-samtools-on-mid.fasta \
+    consensus-reads-12-genome-1-samtools-on-gready.fasta \
+    consensus-reads-12-genome-1-samtools-on-cluster.fasta \
     consensus-12-identity.html \
     reads-12-genome-12-significant-base-frequencies-bowtie2.html \
     reads-12-genome-12-significant-base-frequencies-mid.html \
@@ -44,7 +47,7 @@ dirs:
 	test -d $(BOWTIE2_SAM_DIR) || mkdir $(BOWTIE2_SAM_DIR)
 
 ############################## Genomes and reads
-genome-1.fasta:
+genome-1.fasta genome-2.fasta:
 	$(BIN)/create-mid-experiment-data.py \
             --out . \
             --genomeLength $(GENOME_LENGTH) \
@@ -55,8 +58,8 @@ genome-1.fasta:
             --readCount $(READ_COUNT) \
             --force
 
-genome-12.fasta: genome-1.fasta
-	cat genome-1.fasta genome-2.fasta > genome-12.fasta
+genome-12.fasta: genome-1.fasta genome-2.fasta
+	cat $^ > $@
 
 ############################## Bowtie2 databases.
 $(BOWTIE2_DB_DIR)/genome-1-db.1.bt2: genome-1.fasta
@@ -69,14 +72,14 @@ $(BOWTIE2_DB_DIR)/genome-12-db.1.bt2: genome-1.fasta genome-2.fasta
 	bowtie2-build -f --quiet genome-1.fasta,genome-2.fasta $(BOWTIE2_DB_DIR)/genome-12-db
 
 ############################## Bowtie2 SAM files.
-$(BOWTIE2_SAM_DIR)/reads-1-genome-1-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-1-db.1.bt2 reads-1.fasta
-	bowtie2 --quiet --local --xeq --all -U reads-1.fasta -f -x $(BOWTIE2_DB_DIR)/genome-1-db -S $@
+$(BOWTIE2_SAM_DIR)/reads-1-genome-1-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-1-db.1.bt2 reads-1.fastq
+	bowtie2 --quiet --local --xeq --all -U reads-1.fastq -x $(BOWTIE2_DB_DIR)/genome-1-db -S $@
 
-$(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-2-db.1.bt2 reads-2.fasta
-	bowtie2 --quiet --local --xeq --all -U reads-2.fasta -f -x $(BOWTIE2_DB_DIR)/genome-2-db -S $@
+$(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-2-db.1.bt2 reads-2.fastq
+	bowtie2 --quiet --local --xeq --all -U reads-2.fastq -x $(BOWTIE2_DB_DIR)/genome-2-db -S $@
 
-$(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-12-db.1.bt2 reads-12.fasta
-	bowtie2 --quiet --local --xeq --all -U reads-12.fasta -f -x $(BOWTIE2_DB_DIR)/genome-12-db -S $@
+$(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam: $(BOWTIE2_DB_DIR)/genome-12-db.1.bt2 reads-12.fastq
+	bowtie2 --quiet --local --xeq --all -U reads-12.fastq -x $(BOWTIE2_DB_DIR)/genome-12-db -S $@
 
 #################### Coverage and significant locations plots
 CSL_ARGS := --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) --minReads $(MIN_READS)
@@ -84,18 +87,18 @@ CSL_ARGS := --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) --minReads $(MIN_READS)
 CSL_SCRIPT := $(BIN)/coverage-and-significant-locations.py
 
 reads-12-genome-12-coverage-and-significant-locations.html: $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.sam
-	 $(CSL_SCRIPT) --outFile $@ $(CSL_ARGS) --referenceId genome-1 --samFile $<
+	 $(CSL_SCRIPT) --outfile $@ $(CSL_ARGS) --referenceId genome-1 --samfile $<
 
 reads-1-genome-1-coverage-and-significant-locations.html: $(BOWTIE2_SAM_DIR)/reads-1-genome-1-bowtie2.sam
-	$(CSL_SCRIPT) --outFile $@ $(CSL_ARGS) --referenceId genome-1 --samFile $<
+	$(CSL_SCRIPT) --outfile $@ $(CSL_ARGS) --referenceId genome-1 --samfile $<
 
 reads-2-genome-2-coverage-and-significant-locations.html: $(BOWTIE2_SAM_DIR)/reads-2-genome-2-bowtie2.sam
-	$(CSL_SCRIPT) --outFile $@ $(CSL_ARGS) --referenceId genome-2 --samFile $<
+	$(CSL_SCRIPT) --outfile $@ $(CSL_ARGS) --referenceId genome-2 --samfile $<
 
 ############################## MID connected component analysis
-AGREEMENT_THRESHOLD := 0.55
+AGREEMENT_THRESHOLD ?= 0.55
 
-$(MID_CONSENSUS): $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam genome-1.fasta
+$(MID_CONSENSUS): dirs $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam genome-1.fasta
 	$(BIN)/connected-components.py \
             --alignmentFile $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam \
             --outputDir $(CC_OUT) \
@@ -103,9 +106,31 @@ $(MID_CONSENSUS): $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam genome-1.fas
             --minReads $(MIN_READS) \
             --agreementThreshold $(AGREEMENT_THRESHOLD) \
             --referenceGenome genome-1.fasta \
-            --verbose 2 > cc-1.stdout
-	rm -f component-1-consensuses-identity.html
-	ln -s $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/component-1-consensuses-identity.html
+            --plotSAM \
+            --verbose 2 > cc.stdout
+
+############################## GREADY analysis
+$(GREADY_CONSENSUS): dirs $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam genome-1.fasta
+	$(BIN)/gready.py \
+            --alignmentFile $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam \
+            --outputDir $(GREADY_OUT) \
+            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
+            --minReads $(MIN_READS) \
+            --referenceGenome genome-1.fasta \
+            --plotSAM \
+            --verbose 2 > gready.stdout
+
+############################## CLUSTER analysis
+$(CLUSTER_CONSENSUS): dirs $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam genome-1.fasta
+	$(BIN)/cluster.py \
+            --alignmentFile $(BOWTIE2_SAM_DIR)/reads-12-genome-12-bowtie2.bam \
+            --outputDir $(CLUSTER_OUT) \
+            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
+            --minReads $(MIN_READS) \
+            --cutoff $(CLUSTER_DISTANCE_CUTOFF) \
+            --referenceGenome genome-1.fasta \
+            --plotSAM \
+            --verbose 1 > cluster.stdout
 
 
 ############################## Consensus sequences built with bcftools
@@ -127,6 +152,24 @@ consensus-reads-12-genome-1-samtools-on-mid.fasta: genome-1.fasta $(MID_CONSENSU
 	samtools mpileup -u -f genome-1.fasta $(MID_CONSENSUS_BAM) | \
             bcftools call -c | vcfutils.pl vcf2fq | \
             filter-fasta.py --fastq --idLambda 'lambda _: "consensus-12-samtools-on-mid"' \
+                --saveAs fasta --quiet > $@
+
+consensus-reads-12-genome-1-samtools-on-gready.fasta: genome-1.fasta $(GREADY_CONSENSUS_BAM)
+	samtools mpileup -u -f genome-1.fasta $(GREADY_CONSENSUS_BAM) | \
+            bcftools call -c | vcfutils.pl vcf2fq | \
+            filter-fasta.py --fastq --idLambda 'lambda _: "consensus-12-samtools-on-gready"' \
+                --saveAs fasta --quiet > $@
+
+non-consensus-reads-12-genome-1-samtools-on-gready.fasta: genome-1.fasta $(GREADY_NON_CONSENSUS_BAM)
+	samtools mpileup -u -f genome-1.fasta $(GREADY_NON_CONSENSUS_BAM) | \
+            bcftools call -c | vcfutils.pl vcf2fq | \
+            filter-fasta.py --fastq --idLambda 'lambda _: "non-consensus-12-samtools-on-gready"' \
+                --saveAs fasta --quiet > $@
+
+consensus-reads-12-genome-1-samtools-on-cluster.fasta: genome-1.fasta $(CLUSTER_CONSENSUS_BAM)
+	samtools mpileup -u -f genome-1.fasta $(CLUSTER_CONSENSUS_BAM) | \
+            bcftools call -c | vcfutils.pl vcf2fq | \
+            filter-fasta.py --fastq --idLambda 'lambda _: "consensus-12-samtools-on-cluster"' \
                 --saveAs fasta --quiet > $@
 
 ############################## Significant base frequency plots
@@ -161,7 +204,11 @@ CONSENSUS_FASTA := \
     genome-1.fasta \
     consensus-reads-12-genome-1-samtools.fasta \
     $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.fasta \
+    $(GREADY_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.fasta \
+    $(CLUSTER_OUT)/reads-12-genome-12-bowtie2/genome-1/reference-consensus.fasta \
     consensus-reads-12-genome-1-samtools-on-mid.fasta \
+    consensus-reads-12-genome-1-samtools-on-gready.fasta \
+    consensus-reads-12-genome-1-samtools-on-cluster.fasta \
     genome-2.fasta \
     consensus-reads-12-genome-2-samtools.fasta \
     $(CC_OUT)/reads-12-genome-12-bowtie2/genome-1/non-reference-consensus.fasta
@@ -184,5 +231,5 @@ consensus-12-identity.html: $(CONSENSUS_FASTA)
 clean:
 	rm -f *~
 	rm -f genome-* LOG
-	rm -f *.{sam,bam,fai,fasta,html,stdout}
-	rm -fr $(CC_OUT) $(BOWTIE2_DB_DIR) $(BOWTIE2_SAM_DIR)
+	rm -f *.{fai,fasta,fastq,html,stdout}
+	rm -fr $(CC_OUT) $(GREADY_OUT) $(BOWTIE2_DB_DIR) $(BOWTIE2_SAM_DIR) $(CLUSTER_OUT)

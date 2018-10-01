@@ -12,7 +12,7 @@ from midtools.options import addCommandLineOptions, parseCommandLineOptions
 
 
 def plotConsistency(significantOffsets, baseCountAtOffset,
-                    readsAtOffset, outFile, title, jitter, show):
+                    readsAtOffset, outfile, title, jitter, show):
     """
     """
     x = []
@@ -61,7 +61,7 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
         })
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
 
 
 if __name__ == '__main__':
@@ -95,4 +95,4 @@ if __name__ == '__main__':
          'jitter added' if args.jitter else 'no jitter'))
 
     plotConsistency(significantOffsets, baseCountAtOffset, readsAtOffset,
-                    args.outFile, title, args.jitter, args.show)
+                    args.outfile, title, args.jitter, args.show)

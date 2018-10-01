@@ -1,10 +1,19 @@
-all: plot.html
+MID_CONSENSUS := $(CC_OUT)/genome-bowtie2/genome-1/reference-consensus.sam
+MID_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(MID_CONSENSUS))
+
+GREADY_CONSENSUS := $(GREADY_OUT)/genome-bowtie2/genome-1/reference-consensus.sam
+GREADY_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(GREADY_CONSENSUS))
+
+CLUSTER_CONSENSUS := $(CLUSTER_OUT)/genome-bowtie2/genome-1/reference-consensus.sam
+CLUSTER_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(CLUSTER_CONSENSUS))
+
+all: $(MID_CONSENSUS) $(GREADY_CONSENSUS) $(CLUSTER_CONSENSUS)
 
 genome.fasta:
-	echo '>id' > $@
-	../bin/random-nt-sequence.py $(GENOME_LENGTH) >> $@
+	echo '>genome-1' > $@
+	random-nt-sequence.py $(GENOME_LENGTH) >> $@
 
-reads.fasta: genome.fasta
+reads.fastq: genome.fasta
 	create-reads.py \
             --count $(READ_COUNT) \
             --meanLength $(MEAN_LENGTH) \
@@ -14,14 +23,68 @@ reads.fasta: genome.fasta
 genome-db.1.bt2: genome.fasta
 	bowtie2-build -f --quiet genome.fasta genome-db
 
-genome-bowtie2.sam: genome-db.1.bt2 reads.fasta
-	bowtie2 --quiet --local --xeq --all -U reads.fasta -f -x genome-db -S $@
+genome-bowtie2.sam: genome-db.1.bt2 reads.fastq
+	bowtie2 --quiet --local --xeq --all -U reads.fastq -x genome-db -S $@
 
-plot.html: genome-bowtie2.sam
-	significant-base-frequencies.py \
-            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) --minReads $(MIN_READS) \
-            --title 'Single infection<br>Virus genome $(GENOME_LENGTH) nt, $(READ_COUNT) reads (mean length $(MEAN_LENGTH), sd $(SD_LENGTH)), $(READ_MUTATION_RATE) read mutation rate.' \
-            --outFile $@ --samFile $<
+## Nucleotide frequency
+
+# nucleotide-plot.html: genome-bowtie2.sam
+# 	significant-base-frequencies.py \
+#             --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) --minReads $(MIN_READS) --dropUnmapped \
+#             --title 'Single infection<br>Virus genome $(GENOME_LENGTH) nt, $(READ_COUNT) reads (mean length $(MEAN_LENGTH), sd $(SD_LENGTH)), $(READ_MUTATION_RATE) read mutation rate.' \
+#             --outfile $@ --samfile $<
+
+## Coverage
+
+# CSL_ARGS := --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) --minReads $(MIN_READS)
+# CSL_SCRIPT := $(BIN)/coverage-and-significant-locations.py
+# coverage.html: genome-bowtie2.sam
+# $(CSL_SCRIPT) --outfile $@ $(CSL_ARGS) --referenceId genome-1 --samfile $<
+
+## Connected components
+
+AGREEMENT_THRESHOLD ?= 0.55
+
+$(MID_CONSENSUS): genome-bowtie2.bam genome.fasta
+	$(BIN)/connected-components.py \
+            --alignmentFile genome-bowtie2.bam \
+            --outputDir $(CC_OUT) \
+            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
+            --minReads $(MIN_READS) \
+            --agreementThreshold $(AGREEMENT_THRESHOLD) \
+            --referenceGenome genome.fasta \
+            --plotSAM \
+            --verbose 1 > cc.stdout
+	ln -s $(CC_OUT)/genome-bowtie2/genome-1/reads.html
+	ln -s $(CC_OUT)/genome-bowtie2/genome-1/component-1-consensuses-identity.html
+	ln -s $(CC_OUT)/genome-bowtie2/genome-1/consistent-components-plot.html
+	ln -s $(CC_OUT)/genome-bowtie2/genome-1/coverage-and-significant-offsets.html
+	ln -s $(CC_OUT)/genome-bowtie2/genome-1/reference-base-frequencies.html
+
+$(GREADY_CONSENSUS): genome-bowtie2.bam genome.fasta
+	$(BIN)/gready.py \
+            --alignmentFile genome-bowtie2.bam \
+            --outputDir $(GREADY_OUT) \
+            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
+            --minReads $(MIN_READS) \
+            --referenceGenome genome.fasta \
+            --plotSAM \
+            --verbose 1 > gready.stdout
+	ln -s $(GREADY_OUT)/genome-bowtie2/genome-1/reads.html
+	ln -s $(GREADY_OUT)/genome-bowtie2/genome-1/coverage-and-significant-offsets.html
+	ln -s $(GREADY_OUT)/genome-bowtie2/genome-1/reference-base-frequencies.html
+
+$(CLUSTER_CONSENSUS): genome-bowtie2.bam genome.fasta
+	$(BIN)/cluster.py \
+            --alignmentFile genome-bowtie2.bam \
+            --outputDir $(CLUSTER_OUT) \
+            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
+            --minReads $(MIN_READS) \
+            --cutoff $(CLUSTER_DISTANCE_CUTOFF) \
+            --referenceGenome genome.fasta \
+            --plotSAM \
+            --verbose 1 > cluster.stdout
 
 clean:
-	rm -f *~ genome-db* genome-bowtie2* *.fasta *.html
+	rm -f *~ genome-db* genome-bowtie2* *.fastq *.fasta *.html *.stdout
+	rm -fr $(CC_OUT) $(GREADY_OUT)

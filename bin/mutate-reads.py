@@ -43,6 +43,7 @@ if __name__ == '__main__':
     verbose = args.verbose
     editIds = args.editIds
     idSuffix = args.idSuffix
+    format_ = 'fastq' if args.fastq else 'fasta'
 
     for read in reads:
         count = len(mutateRead(read, rate))
@@ -52,4 +53,4 @@ if __name__ == '__main__':
         read.id = (read.id +
                    (('-mutations:%d' % count) if editIds else '') +
                    idSuffix)
-        print(read.toString('fasta'), end='')
+        print(read.toString(format_), end='')

@@ -26,5 +26,5 @@ if __name__ == '__main__':
           (len(alignedReads), len(significantOffsets)))
 
     plotCoverageAndSignificantLocations(
-        readCountAtOffset, genomeLength, significantOffsets, args.outFile,
+        readCountAtOffset, genomeLength, significantOffsets, args.outfile,
         title=args.title, show=args.show)

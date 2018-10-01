@@ -46,7 +46,7 @@ def sampleIdKey(id_):
     return prefix, value, trailing
 
 
-def plotScores(sampleData, outFile):
+def plotScores(sampleData, outfile):
     """
     Plot the sorted base scores for the samples in C{sampleData}.
     """
@@ -95,7 +95,7 @@ def plotScores(sampleData, outFile):
 
     layout = go.Layout(xaxis=xaxis, yaxis=yaxis)
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile, show_link=False)
+    plotly.offline.plot(fig, filename=outfile, show_link=False)
 
 
 if __name__ == '__main__':
@@ -113,7 +113,7 @@ if __name__ == '__main__':
               'significant-base-frequencies.py'))
 
     parser.add_argument(
-        '--outFile', default='multiple-significant-base-frequencies.html',
+        '--outfile', default='multiple-significant-base-frequencies.html',
         help='The filename to store the resulting HTML.')
 
     args = parser.parse_args()
@@ -127,4 +127,4 @@ if __name__ == '__main__':
                 'text': x['text'],
             }
 
-    plotScores(data, args.outFile)
+    plotScores(data, args.outfile)

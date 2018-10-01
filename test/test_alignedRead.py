@@ -39,3 +39,33 @@ class TestAlignedRead(TestCase):
         """
         ar = AlignedRead('id', '---ACGTACGT--')
         self.assertFalse(ar.trim(4))
+
+    def testSetSignificantOffsets(self):
+        """
+        Adding some significant offsets must work as expected.
+        """
+        ar = AlignedRead('id', '---ACGTACGT--')
+        ar.setSignificantOffsets([2, 3, 4])
+        self.assertEqual({3: 'A', 4: 'C'}, ar.significantOffsets)
+
+    def testBaseNone(self):
+        """
+        The base method must return C{None} for an offset the read does not
+        have.
+        """
+        ar = AlignedRead('id', '---ACGTACGT--')
+        self.assertEqual(None, ar.base(0))
+
+    def testBase(self):
+        """
+        The base method must return the expected nucleotide.
+        """
+        ar = AlignedRead('id', '---ACGTGCGT--')
+        self.assertEqual('A', ar.base(3))
+
+    def testToPaddedString(self):
+        """
+        The toPaddedString method must return the expected string.
+        """
+        ar = AlignedRead('id', '---ACGTGCGT--')
+        self.assertEqual('>id\n---ACGTGCGT--\n', ar.toPaddedString())

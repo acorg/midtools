@@ -3,7 +3,8 @@
 from __future__ import division, print_function
 
 from itertools import chain
-from midtools.connectedComponentAnalysis import ConnectedComponentAnalysis
+
+from midtools.greadyAnalysis import GreadyAnalysis
 from midtools.options import addAnalysisCommandLineOptions
 
 
@@ -17,25 +18,22 @@ if __name__ == '__main__':
     addAnalysisCommandLineOptions(parser)
 
     parser.add_argument(
-        '--agreementThreshold', type=float,
-        default=ConnectedComponentAnalysis.DEFAULT_AGREEMENT_THRESHOLD,
-        help=('Only reads with agreeing nucleotides at at least this fraction '
-              'of the significant sites they have in common will be '
-              'considered connected (this is for the second phase of adding '
-              'reads to a component.'))
+        '--cutoff', type=float, default=0.5,
+        help=('Reads with a score less than this will not be put into the '
+              'consensus.'))
 
     args = parser.parse_args()
 
     referenceIds = (list(chain.from_iterable(args.referenceId))
                     if args.referenceId else None)
-    ConnectedComponentAnalysis(
+    GreadyAnalysis(
         alignmentFiles=list(chain.from_iterable(args.alignmentFile)),
         referenceGenomeFiles=list(chain.from_iterable(args.referenceGenome)),
         referenceIds=referenceIds,
+        cutoff=args.cutoff,
         outputDir=args.outputDir,
         minReads=args.minReads,
         homogeneousCutoff=args.homogeneousCutoff,
-        agreementThreshold=args.agreementThreshold,
         saveReducedFASTA=args.saveReducedFASTA,
         plotSAM=args.plotSAM,
         verbose=args.verbose).run()

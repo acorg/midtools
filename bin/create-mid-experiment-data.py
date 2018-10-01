@@ -9,7 +9,11 @@ from os.path import exists, join
 from random import choice
 from six.moves import shlex_quote as quote
 
+from dark.fasta import FastaReads
 from dark.process import Executor
+from dark.reads import Reads
+
+from midtools.mutate import mutateRead
 
 
 def main(args, logfp):
@@ -20,12 +24,14 @@ def main(args, logfp):
     @param logfp: A file object to write log information to.
     """
     print('Invocation arguments', args, file=logfp)
+
     qOutputDir = quote(args.outputDir)
     genome1 = join(qOutputDir, 'genome-1.fasta')
     genome2 = join(qOutputDir, 'genome-2.fasta')
-    reads1 = join(qOutputDir, 'reads-1.fasta')
-    reads2 = join(qOutputDir, 'reads-2.fasta')
-    reads12 = join(qOutputDir, 'reads-12.fasta')
+    genome2locations = join(qOutputDir, 'genome-2.locations')
+    reads1 = join(qOutputDir, 'reads-1.fastq')
+    reads2 = join(qOutputDir, 'reads-2.fastq')
+    reads12 = join(qOutputDir, 'reads-12.fastq')
 
     executor = Executor(args.dryRun)
 
@@ -39,21 +45,24 @@ def main(args, logfp):
         print('Writing random starting genome of length %d to %s' %
               (args.genomeLength, genome1), file=logfp)
         if not args.dryRun:
+            sequence = ''.join([choice('ACGT')
+                                for _ in range(args.genomeLength)])
             with open(genome1, 'w') as fp:
-                print('>genome-1\n%s' % (
-                    ''.join([choice('ACGT')
-                             for _ in range(args.genomeLength)])), file=fp)
+                print('>genome-1\n%s' % sequence, file=fp)
 
     if args.genome2Filename:
         executor.execute('ln -s %s %s' %
                          (quote(args.genome2Filename), genome2))
     else:
-        # Make a second genome using the given mutation rate.
-        executor.execute(
-            'mutate-reads.py --rate %s < %s | '
-            'filter-fasta.py --quiet '
-            '--idLambda \'lambda _: "genome-2"\'> %s' %
-            (args.genome2MutationRate, genome1, genome2))
+        # Make a second genome using the given mutation rate. Print its
+        # mutated locations to a file.
+        (genome1read,) = list(FastaReads(genome1))
+        offsets = mutateRead(genome1read, args.genome2MutationRate)
+        with open(genome2locations, 'w') as fp:
+            print('\n'.join(str(offset + 1) for offset in sorted(offsets)),
+                  file=fp)
+        genome1read.id = 'genome-2'
+        Reads([genome1read]).save(genome2)
 
     cmdPrefix = (
         'create-reads.py --maxReadLength %d --minReadLength %d '
@@ -153,6 +162,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sdReadLength', type=float, default=10.0,
         help='The standard deviation of the length of created reads.')
+
+    parser.add_argument(
+        '--qualityChar', default='I',
+        help='The quality character to use for all read quality scores')
 
     args = parser.parse_args()
 

@@ -1,5 +1,23 @@
-GENOME_LENGTH := 1000
-HOMOGENEOUS_CUTOFF := 0.95
-MEAN_LENGTH := 100
-SD_LENGTH := 18
-MIN_READS := 5
+############################## Rules
+%.bam : %.sam
+	samtools view -b < $< | samtools sort - > $@
+	samtools index $@
+
+%.stats: %.sam
+	sam-reference-read-counts.py $< > $@
+
+%.fasta: %.fastq
+	filter-fasta.py --quiet --fastq --saveAs fasta < $< > $@
+
+BIN ?= ../../bin
+
+CC_OUT ?= cc.out
+GREADY_OUT ?= gready.out
+CLUSTER_OUT ?= cluster.out
+
+GENOME_LENGTH ?= 1000
+HOMOGENEOUS_CUTOFF ?= 0.95
+CLUSTER_DISTANCE_CUTOFF ?= 0.25
+MEAN_LENGTH ?= 100
+SD_LENGTH ?= 18
+MIN_READS ?= 5

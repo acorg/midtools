@@ -1,4 +1,6 @@
 import colorlover as cl
+from collections import Counter
+
 from dark.process import Executor
 
 
@@ -9,6 +11,9 @@ def baseCountsToStr(counts):
     @param counts: A C{Counter} instance.
     @return: A C{str} representation of nucleotide counts at an offset.
     """
+    if not isinstance(counts, Counter):
+        counts = counts._counts
+
     return ' '.join([
         ('%s:%d' % (base, counts[base])) for base in sorted(counts)])
 
@@ -17,17 +22,19 @@ def nucleotidesToStr(nucleotides, prefix=''):
     """
     Convert offsets and base counts to a string.
 
-    @param nucleotides: A C{defaultdict(Counter)} instance, keyed
-        by C{int} offset, with nucleotides keying the Counters.
+    @param nucleotides: A C{dict} keyed by C{int} offset, with either
+        C{collections.Counter} or C{OffsetBases} instances as values.
     @param prefix: A C{str} to put at the start of each line.
     @return: A C{str} representation of the offsets and nucleotide
         counts for each.
     """
     result = []
     for offset in sorted(nucleotides):
-        result.append(
-            '%s%d: %s' % (prefix, offset,
-                          baseCountsToStr(nucleotides[offset])))
+        if isinstance(nucleotides[offset], Counter):
+            baseCounts = baseCountsToStr(nucleotides[offset])
+        else:
+            baseCounts = nucleotides[offset].baseCountsToStr()
+        result.append('%s%d: %s' % (prefix, offset, baseCounts))
     return '\n'.join(result)
 
 
@@ -48,7 +55,11 @@ def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
         if there is a draw and the most common nucleotides includes
         C{drawBreaker}, return C{drawBreaker}.
     """
-    orderedCounts = counts.most_common()
+    if isinstance(counts, Counter):
+        orderedCounts = counts.most_common()
+    else:
+        # An OffsetBases instance. Ugh...
+        orderedCounts = counts._counts.most_common()
 
     maxCount = orderedCounts[0][1]
     best = [x for x in orderedCounts if x[1] == maxCount]

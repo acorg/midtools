@@ -17,7 +17,7 @@ def zeroScore(_, __):
 
 
 def plotConsistency(significantOffsets, baseCountAtOffset,
-                    readsAtOffset, minCommonReads, outFile, title, show):
+                    readsAtOffset, minCommonReads, outfile, title, show):
     """
     """
     scores = []
@@ -112,7 +112,7 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
     layout = go.Layout(layoutDict)
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outFile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
 
 
 if __name__ == '__main__':
@@ -149,4 +149,4 @@ if __name__ == '__main__':
         'diagonal, NID below' % len(significantOffsets))
 
     plotConsistency(significantOffsets, baseCountAtOffset, readsAtOffset,
-                    args.minCommonReads, args.outFile, title, args.show)
+                    args.minCommonReads, args.outfile, title, args.show)
