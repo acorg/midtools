@@ -19,7 +19,7 @@ def addCommonOptions(parser):
         '--homogeneousCutoff', type=float, default=0.9,
         help=('If the most common nucleotide at a location occurs more than '
               'this fraction of the time (i.e., amongst all reads that cover '
-              'the location) then the locaion will be considered homogeneous '
+              'the location) then the location will be considered homogeneous '
               'and therefore uninteresting.'))
 
 

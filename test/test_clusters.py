@@ -318,9 +318,14 @@ class TestReadClusters(TestCase):
 
     def testMultiplicativeDistanceOneQuarter(self):
         """
-        The multiplicative distance between two clusters must be 0.25 when
-        they are identical and the maximum fraction of common offsets is
-        0.75.
+        The multiplicative distance between two clusters must be 0.1 when
+        they are identical and the minimum fraction of common offsets
+        (ReadClusters.COMMON_OFFSETS_MAX_FRACTION_MIN) is 0.9. That fraction
+        is used in the following because 3 of the first cluster's sites and
+        3 of the second's are in common, and those fractions are 3/4 and 3/6
+        which are both less than the 0.9 value of
+        ReadClusters.COMMON_OFFSETS_MAX_FRACTION_MIN so it it used to scale
+        the commonNucleotidesAgreementDistance distance.
         """
         read1 = AlignedRead('id1', '-----CCGT')
         read1.setSignificantOffsets([5, 6, 7, 8])
@@ -333,14 +338,15 @@ class TestReadClusters(TestCase):
         cluster2 = rc.add(read2)
 
         self.assertAlmostEqual(
-            0.25, rc.multiplicativeDistance(cluster1, cluster2))
+            0.1, rc.multiplicativeDistance(cluster1, cluster2))
 
     def testMultiplicativeDistanceOneQuarterLowOffsetCoverage(self):
         """
-        The multiplicative distance between two clusters must be 0.25 when
+        The multiplicative distance between two clusters must be 0.1 when
         they are identical but the maximum fraction of common offsets is
-        one half (in which case the 0.75 minimum offset coverage fraction
-        will be applied).
+        one half (in which case the 0.9 minimum offset coverage fraction
+        will be applied, as explained in the docstring for the
+        testMultiplicativeDistanceOneQuarter test above).
         """
         read1 = AlignedRead('id1', '-----CCGTTT')
         read1.setSignificantOffsets([5, 6, 7, 8, 9, 10])
@@ -353,14 +359,16 @@ class TestReadClusters(TestCase):
         cluster2 = rc.add(read2)
 
         self.assertAlmostEqual(
-            0.25, rc.multiplicativeDistance(cluster1, cluster2))
+            0.1, rc.multiplicativeDistance(cluster1, cluster2))
 
     def testMultiplicativeDistanceThreeQuartersLowOffsetCoverage(self):
         """
-        The multiplicative distance between two clusters must be 0.625 when
+        The multiplicative distance between two clusters must be 0.55 when
         they agree 50% and the maximum fraction of common offsets is
-        0.5 (in which case the 0.75 minimum offset coverage fraction
-        will be applied) because 1.0 - (0.5 * max(0.75, 0.5)) = 0.625).
+        0.5 (in which case the 0.9 minimum offset coverage fraction
+        will be applied as described in the
+        testMultiplicativeDistanceOneQuarter test above) because
+        1.0 - (0.5 * max(0.9, 0.5)) = 0.55).
         """
         read1 = AlignedRead('id1', '-----CAGT')
         read1.setSignificantOffsets([5, 6, 7, 8])
@@ -373,7 +381,7 @@ class TestReadClusters(TestCase):
         cluster2 = rc.add(read2)
 
         self.assertAlmostEqual(
-            0.625, rc.multiplicativeDistance(cluster1, cluster2))
+            0.55, rc.multiplicativeDistance(cluster1, cluster2))
 
     def testMultiplicativeDistanceZero(self):
         """

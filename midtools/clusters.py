@@ -59,9 +59,15 @@ class ReadCluster(object):
     @staticmethod
     def commonOffsetsMaxFraction(a, b):
         """
-        Compute the maximum fraction of the number of common offsets
-        (between two clusters) and the number of offsets covered by each
-        cluster.
+        Compute the fraction of a cluster's sites that are in common with
+        another cluster. Do this for two clusters and return the higher
+        of the two fractions. E.g., Suppose one cluster has sites 10, 12, 14,
+        and 15 and the other cluster has sites 14, 15, ..., 50. Then there
+        are two sites in common (14 and 15) and the fractions are 2/4 and 2/37,
+        so we return 0.5 (i.e., 2/4) because it is the larger of the two
+        fractions. We can use this maximum fraction to tell whether, given a
+        pair of clusters, the sites they have in common are a high proportion
+        of the total sites for either of the clusters.
 
         @param a: A C{ReadCluster} instance.
         @param b: A C{ReadCluster} instance.
@@ -90,6 +96,8 @@ class ReadCluster(object):
 
         if commonOffsets:
             similarity = sum(
+                # 1.0 - OffsetBases.multiplicativeDistance(
+                #        aNucleotides[offset], bNucleotides[offset])
                 1.0 - min(
                     OffsetBases.multiplicativeDistance(
                         aNucleotides[offset], bNucleotides[offset]),
@@ -103,14 +111,36 @@ class ReadCluster(object):
     @staticmethod
     def commonNucleotidesAgreementDistance(a, b):
         """
-        Measure the distance from one cluster to another, according to how
-        often the intersection of the commonest nucleotides (at each site)
-        is non-empty. The distance is 1.0 minus the fraction of common sites
-        with a non-empty intersection.
+        Measure the distance from one cluster to another.
+
+        The distance is 1.0 minus the fraction of common sites that either
+        (a) agree on what the most common nucleotide is a the site or else
+        (b) where one cluster has an overwhelming opinion about the most
+        likely nucleotide.
+
+            In (a), each site in both clusters is examined for its most
+            frequent nucleotide set (there may be more than one equally
+            frequent nucleotide). If the intersection of the two sets for a
+            site is non-empty, that site counts as matching. E.g. if the
+            cluster for one site has 6 x A and 2 x C and the same site in
+            the other cluster has 3 x A and 3 x G, the sites agree because
+            A is in the most common nucleotides set for each cluster.
+
+            In (b) if, e.g., one cluster has 100 x A and the other cluster
+            has just 3 x G, then you could argue that the two clusters
+            don't really differ at that site because in a merged cluster
+            the As would completely overwhelm the Gs. So we count such
+            sites as matching too, so long as the numerical dominance of
+            one cluster over the other is at least
+            self.MIN_COMMONEST_MULTIPLE
+
+        The fraction of common sites matching under (a) or (b) is a measure
+        of similarity, so we return 1.0 minus that in order to have a distance.
 
         @param a: A C{ReadCluster} instance.
         @param b: A C{ReadCluster} instance.
         @return: The C{float} [0.0, 1.0] distance between C{a} and C{b}.
+
         """
         aNucleotides = a.nucleotides
         bNucleotides = b.nucleotides
@@ -123,6 +153,7 @@ class ReadCluster(object):
                 bNucleotidesAtOffset = bNucleotides[offset]
                 if (aNucleotidesAtOffset.commonest &
                         bNucleotidesAtOffset.commonest):
+                    # This is case (a) above.
                     matching += 1
                 else:
                     multiple = OffsetBases.highestFrequenciesMultiple(
@@ -132,6 +163,7 @@ class ReadCluster(object):
                     # case is dealt with by the first part of this if/then.
                     assert multiple is not None
                     if multiple >= ReadCluster.MIN_COMMONEST_MULTIPLE:
+                        # This is case (b) above.
                         matching += 1
 
             return 1.0 - (matching / len(commonOffsets))
@@ -202,7 +234,8 @@ class ReadClusters(object):
 
         # The following is 1.0 minus the product of two similarities,
         # giving a distance. We don't let the similarity penalty for
-        # covered offset fraction be greater than 0.75.
+        # covered offset fraction be greater than
+        # COMMON_OFFSETS_MAX_FRACTION_MIN.
         return 1.0 - (
             (1.0 - ReadCluster.commonNucleotidesMultiplicativeDistance(a, b))
             *
@@ -286,8 +319,8 @@ class ReadClusters(object):
                  (matchCount, sharedCount)),
             ] + [
                 '  %d: %*s    %*s    %s' %
-                (offset, result1Width, line1, result2Width, line2, match) for
-                (offset, line1, line2, match) in
+                (offset + 1, result1Width, line1, result2Width, line2, match)
+                for (offset, line1, line2, match) in
                 zip(allOffsets, result1, result2, matches)
             ]
         )
@@ -371,9 +404,9 @@ class ReadClusters(object):
                  (matchCount, sharedCount)),
             ] + [
                 '  %d: %*s    %*s    %*s    %s' %
-                (offset, result1Width, line1, result2Width, line2,
-                 offsetScoresWidth, offsetScore, match) for
-                (offset, line1, line2, offsetScore, match) in
+                (offset + 1, result1Width, line1, result2Width, line2,
+                 offsetScoresWidth, offsetScore, match)
+                for (offset, line1, line2, offsetScore, match) in
                 zip(allOffsets, result1, result2, offsetScores, matches)
             ]
         )
@@ -383,7 +416,7 @@ class ReadClusters(object):
         Perform the cluster analysis, up to a given distance cut off.
 
         @param cutoff: The C{float} distance at which clustering will be
-            stopped.
+            stopped. Clusters at any greater distance will not be merged.
         @param fp: A file-like object to write information to, or C{None}
             if no output should be produced.
         @return: A generator that yields C{ReadCluster} instances, being the

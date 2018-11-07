@@ -412,6 +412,7 @@ class ReadAnalysis(object):
         alignedReads = []
         samFilter = SAMFilter(alignmentFile, referenceIds={referenceId},
                               dropDuplicates=True, dropSupplementary=True,
+                              # dropSecondary=True,
                               storeQueryIds=True)
         paddedSAM = PaddedSAM(samFilter)
         for query in paddedSAM.queries(addAlignment=True):

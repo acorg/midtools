@@ -17,7 +17,8 @@ from midtools.utils import (
     baseCountsToStr, alignmentQuality)
 
 
-def connectedComponentsByOffset(significantReads, threshold, fp, verbose=0):
+def connectedComponentsByOffset(significantReads, maxClusterDist, fp,
+                                verbose=0):
     """
     Yield sets of reads that are connected according to what significant
     offsets they cover (the nucleotides at those offsets are irrelevant at
@@ -25,8 +26,8 @@ def connectedComponentsByOffset(significantReads, threshold, fp, verbose=0):
 
     @param significantReads: A C{set} of C{AlignedRead} instances, all of
         which cover at least one significant offset.
-    @param threshold: A C{float} indicating the distance at which clustering
-        should be aborted.
+    @param maxClusterDist: A C{float} indicating the distance beyond which
+        clustering should be aborted.
     @param fp: A file-like object to write information to.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
     @return: A generator that yields C{ComponentByOffsets} instances.
@@ -48,7 +49,8 @@ def connectedComponentsByOffset(significantReads, threshold, fp, verbose=0):
             if reads:
                 significantReads.difference_update(reads)
                 component.update(reads)
-        yield ComponentByOffsets(component, offsets, threshold, fp, verbose)
+        yield ComponentByOffsets(component, offsets, maxClusterDist, fp,
+                                 verbose)
 
 
 class ClusterComponent(object):
@@ -96,13 +98,12 @@ class ClusterComponent(object):
         sequence = []
         for offset in sorted(componentOffsets):
             if offset in self.nucleotides:
-                # This next line must be wrong, as it's not passing the
-                # reference base as the draw breaker!
                 referenceBase = referenceSequence[offset]
                 base = commonest(
-                    self.nucleotides[offset], referenceBase, infoFp,
-                    'WARNING: consensus draw at offset %d' % offset +
-                    ' %(baseCounts)s.')
+                    self.nucleotides[offset], referenceBase, drawFp=infoFp,
+                    drawMessage=(
+                        'WARNING: consensus draw at offset %d' % offset +
+                        ' %(baseCounts)s.'))
             else:
                 base = '-'
             sequence.append(base)
@@ -123,12 +124,11 @@ class ClusterComponent(object):
         @param consensusFp: A file pointer to write the consensus to.
         @param drawFp: A file pointer to write draw (and other) info to.
         """
-        print(
-            Read('consistent-component-%d-consensus (based on %d reads)' %
-                 (count, len(self.reads)),
-                 self.consensusSequence(
-                     componentOffsets, referenceSequence, infoFp
-                 )).toString('fasta'), file=consensusFp, end='')
+        sequence = self.consensusSequence(componentOffsets, referenceSequence,
+                                          infoFp)
+        id_ = 'consistent-component-%d-consensus (based on %d reads)' % (
+               count, len(self.reads))
+        print(Read(id_, sequence).toString('fasta'), file=consensusFp, end='')
 
     def summarize(self, fp, count, componentOffsets, referenceSequence):
         """
@@ -162,17 +162,16 @@ class ComponentByOffsets(object):
 
     @param reads: A C{list} of C{AlignedSegment} instances.
     @param offsets: A C{set} of significant offsets covered by C{reads}.
-    @param cutoff: The C{float} inter-cluster distance above which clusters
-        are too different to merge.
+    @param maxClusterDist: The C{float} inter-cluster distance above which
+        clusters are too different to merge.
     @param fp: A file-like object to write information to.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
     """
-    # MIN_CLUSTER_READS = 5
 
-    def __init__(self, reads, offsets, cutoff, fp, verbose=0):
+    def __init__(self, reads, offsets, maxClusterDist, fp, verbose=0):
         self.reads = reads
         self.offsets = offsets
-        self.cutoff = cutoff
+        self.maxClusterDist = maxClusterDist
         self.consistentComponents = list(self.findClusters(fp, verbose))
         self._check()
 
@@ -231,8 +230,8 @@ class ComponentByOffsets(object):
 
     def findClusters(self, fp, verbose):
         """
-        Find clusters of reads up to the difference threshold in
-        self.cutoff according to what nucleotides they have at their
+        Find clusters of reads up to the maximum cluster distance threshold in
+        self.maxClusterDist according to what nucleotides they have at their
         significant offsets.
 
         @param fp: A file-like object to write information to.
@@ -244,17 +243,12 @@ class ComponentByOffsets(object):
         for read in sorted(self.reads):
             readClusters.add(read)
 
-        for readCluster in readClusters.analyze(self.cutoff, fp):
+        for readCluster in readClusters.analyze(self.maxClusterDist, fp):
             if verbose:
                 print(
                     '      Found cluster with %d reads, covering %d offsets' %
                     (len(readCluster.reads), len(readCluster.nucleotides)),
                     file=fp)
-            # if len(readCluster.reads) < self.MIN_CLUSTER_READS:
-            #     if verbose:
-            #         print('Cluster with only %d reads ignored' %
-            #               len(readCluster.reads), file=fp)
-            # else:
             yield ClusterComponent(readCluster.reads, readCluster.nucleotides)
 
     def saveConsensuses(self, outputDir, count, referenceSequence, verbose):
@@ -310,8 +304,11 @@ class ClusterAnalysis(ReadAnalysis):
         One of the SAM/BAM files given using C{alignmentFiles} should have an
         alignment against the given argument. If omitted, all references that
         are aligned to in the given BAM/SAM files will be analyzed.
-    @param cutoff: Reads with a significant offset C{float} mismatch fraction
-        greater than this will not be put into the consensus alignment.
+    @param maxClusterDist: The C{float} inter-cluster distance above which
+        clusters are too different to merge.
+    @param alternateNucleotideMinFreq: The C{float} frequency that an
+        alternative nucleotide (i.e., not the one chosen for the consensus)
+        must have in order to be selected for the alternate consensus.
     @param outputDir: The C{str} directory to save result files to.
     @param minReads: The C{int} minimum number of reads that must cover a
         location for it to be considered significant.
@@ -325,13 +322,16 @@ class ClusterAnalysis(ReadAnalysis):
         input but with just the signifcant locations.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
     """
-    DEFAULT_CUTOFF = 0.35
+    DEFAULT_MAX_CLUSTER_DIST = 0.2
+    ALTERNATE_NUCLEOTIDE_MIN_FREQ_DEF = 0.15
 
-    def __init__(self, alignmentFiles, referenceGenomeFiles, referenceIds=None,
-                 cutoff=DEFAULT_CUTOFF, outputDir=None,
-                 minReads=ReadAnalysis.DEFAULT_MIN_READS,
-                 homogeneousCutoff=ReadAnalysis.DEFAULT_HOMOGENEOUS_CUTOFF,
-                 plotSAM=False, saveReducedFASTA=False, verbose=0):
+    def __init__(
+            self, alignmentFiles, referenceGenomeFiles, referenceIds=None,
+            maxClusterDist=DEFAULT_MAX_CLUSTER_DIST,
+            alternateNucleotideMinFreq=ALTERNATE_NUCLEOTIDE_MIN_FREQ_DEF,
+            outputDir=None, minReads=ReadAnalysis.DEFAULT_MIN_READS,
+            homogeneousCutoff=ReadAnalysis.DEFAULT_HOMOGENEOUS_CUTOFF,
+            plotSAM=False, saveReducedFASTA=False, verbose=0):
 
         ReadAnalysis.__init__(
             self, alignmentFiles, referenceGenomeFiles,
@@ -340,7 +340,8 @@ class ClusterAnalysis(ReadAnalysis):
             homogeneousCutoff=homogeneousCutoff, plotSAM=plotSAM,
             saveReducedFASTA=saveReducedFASTA, verbose=verbose)
 
-        self.cutoff = cutoff
+        self.maxClusterDist = maxClusterDist
+        self.alternateNucleotideMinFreq = alternateNucleotideMinFreq
 
     def analyzeReferenceId(self, referenceId, alignmentFile, outputDir):
         """
@@ -377,12 +378,18 @@ class ClusterAnalysis(ReadAnalysis):
 
         self.saveComponentConsensuses(referenceId, components, outputDir)
 
-        (consensusRead, unwantedReads, wantedCcReadCount,
+        (consensusRead,
+         unwantedReads,
+         wantedCcReadCount,
          consensusReadCountAtOffset,
          consensusWantedReadsBaseCountAtOffset) = (
              self.saveClosestReferenceConsensus(
                  referenceId, components, baseCountAtOffset, genomeLength,
                  alignedReads, paddedSAM.referenceInsertions, outputDir))
+
+        self.saveAlternateConsensus(
+            referenceId, consensusRead, baseCountAtOffset, readCountAtOffset,
+            genomeLength, outputDir)
 
         self.plotConsistentComponents(
             referenceId, alignmentFile, genomeLength, components,
@@ -420,8 +427,8 @@ class ClusterAnalysis(ReadAnalysis):
         with open(filename, 'w') as fp:
             for count, component in enumerate(
                     connectedComponentsByOffset(
-                        significantReads, self.cutoff, fp, self.verbose),
-                    start=1):
+                        significantReads, self.maxClusterDist, fp,
+                        self.verbose), start=1):
                 components.append(component)
 
         # Sanity check: The significantReads set should be be empty
@@ -503,9 +510,8 @@ class ClusterAnalysis(ReadAnalysis):
             reference sequence and the C{str} of nucleotide that would be
             inserted starting at that offset.
         @param outputDir: A C{str} directory path.
-        @return: A 2-tuple with 1) the C{dark.Read} instance with the closest
-            consensus to the reference, and 2) a C{list} of the best
-            consistent connected components used to make the consensus.
+        @return: A tuple of (consensus, unwantedReads, wantedCcReadCount,
+                 wantedReadsCountAtOffset, wantedReadsBaseCountAtOffset).
         """
 
         def ccMatchCount(cc, reference, drawFp, drawMessage):
@@ -529,11 +535,13 @@ class ClusterAnalysis(ReadAnalysis):
             nucleotides = cc.nucleotides
             count = 0
             for offset in nucleotides:
-                message = drawMessage + (
-                    ' offset %d: base counts' % offset) + ' %(baseCounts)s.'
+                message = (
+                    drawMessage +
+                    (' location %d: base counts' % (offset + 1)) +
+                    ' %(baseCounts)s.')
                 referenceBase = referenceSequence[offset]
                 componentBase = commonest(nucleotides[offset], referenceBase,
-                                          drawFp, message)
+                                          drawFp=drawFp, drawMessage=message)
                 count += int(componentBase == referenceBase)
             return count
 
@@ -572,7 +580,7 @@ class ClusterAnalysis(ReadAnalysis):
         else:
             referenceIdRest = ' ' + fields[1]
 
-        infoFile = join(outputDir, 'consensus.txt')
+        infoFile = join(outputDir, 'reference-consensus.txt')
         self.report('    Saving closest consensus to reference info to',
                     infoFile)
 
@@ -583,9 +591,11 @@ class ClusterAnalysis(ReadAnalysis):
             wantedReads = set()
             unwantedReads = set()
             for count, component in enumerate(components, start=1):
-                print('\nExamining component %d with %d offsets: %s' %
+                print('\nExamining component %d with %d locations: %s' %
                       (count, len(component.offsets),
-                       commas(component.offsets)), file=infoFp)
+                       commas(
+                           map(lambda offset: offset + 1, component.offsets))),
+                      file=infoFp)
                 componentOffsets = set(component.offsets)
                 sortedCcs = sortedConsistentComponent(component, reference,
                                                       infoFp)
@@ -603,7 +613,7 @@ class ClusterAnalysis(ReadAnalysis):
 
                     print('  Incorporating nucleotides from consistent '
                           'component %d (%d reads, score %.2f, covering %d '
-                          'offsets (%d still undecided in consensus)) to '
+                          'locations (%d still undecided in consensus)) to '
                           'consensus.' %
                           (ccIndex + 1, len(cc.reads), score,
                            len(cc.nucleotides),
@@ -617,9 +627,11 @@ class ClusterAnalysis(ReadAnalysis):
                         nucleotides = cc.nucleotides[offset]
                         referenceBase = reference.sequence[offset]
                         base = commonest(
-                            nucleotides, referenceBase, infoFp,
-                            ('      WARNING: base count draw at offset %d ' %
-                             offset) + ' %(baseCounts)s.')
+                            nucleotides, referenceBase, drawFp=infoFp,
+                            drawMessage=(
+                                '      WARNING: base count draw at '
+                                'location %d '
+                                % (offset + 1)) + ' %(baseCounts)s.')
                         assert consensus[offset] is None
                         consensus[offset] = base
                         offsetsDone.add(offset)
@@ -630,16 +642,18 @@ class ClusterAnalysis(ReadAnalysis):
                         else:
                             consensusBase = commonest(
                                 baseCountAtOffset[offset], referenceBase,
-                                infoFp,
-                                ('      WARNING: consensus base count draw at '
-                                 'offset %d ' % offset) + ' %(baseCounts)s.')
+                                drawFp=infoFp,
+                                drawMessage=(
+                                    '      WARNING: consensus base count '
+                                    'draw at location %d ' % (offset + 1)) +
+                                ' %(baseCounts)s.')
                             mismatch = (
                                 ' (mismatch: reference has %s, all-read '
                                 'consensus has %s)' % (referenceBase,
                                                        consensusBase))
 
-                        print('    Offset %d: %s from nucleotides %s%s' %
-                              (offset, base, nucleotides.baseCountsToStr(),
+                        print('    Location %d: %s from nucleotides %s%s' %
+                              (offset + 1, base, nucleotides.baseCountsToStr(),
                                mismatch), file=infoFp)
 
                 # Print info about the cccs that were not needed to cover
@@ -649,7 +663,7 @@ class ClusterAnalysis(ReadAnalysis):
                     unwantedReads |= cc.reads
                     print('  Will NOT incorporate nucleotides from consistent '
                           'component %d (%d reads, score %.2f, covering %d '
-                          'offsets) to consensus.' %
+                          'locations) to consensus.' %
                           (ccIndex + 1, len(cc.reads), score,
                            len(cc.nucleotides)), file=infoFp)
 
@@ -663,20 +677,22 @@ class ClusterAnalysis(ReadAnalysis):
             # those not used in the connected components.
             offsetsToTry = sorted(set(range(genomeLength)) - offsetsDone)
             print('\nAttempting to add bases from %d non-significant '
-                  'consensus offsets, using all reads, EXCEPT those belonging '
-                  'to unused consistent components:' % len(offsetsToTry),
-                  file=infoFp)
+                  'consensus locations, using all reads, EXCEPT those '
+                  'belonging to unused consistent components:' %
+                  len(offsetsToTry), file=infoFp)
             for offset in offsetsToTry:
                 assert consensus[offset] is None
                 baseCount = wantedReadsBaseCountAtOffset[offset]
                 if baseCount:
                     referenceBase = reference.sequence[offset]
                     base = commonest(
-                        baseCount, referenceBase, infoFp,
-                        ('    WARNING: consensus base count draw at '
-                         'offset %d' % offset) + ' %(baseCounts)s.')
-                    print('  Offset %d: %s from nucleotides %s' %
-                          (offset, base, baseCountsToStr(baseCount)),
+                        baseCount, referenceBase, drawFp=infoFp,
+                        drawMessage=(
+                            '    WARNING: consensus base count draw at '
+                            'location %d' % (offset + 1)) +
+                        ' %(baseCounts)s.')
+                    print('  Location %d: %s from nucleotides %s' %
+                          (offset + 1, base, baseCountsToStr(baseCount)),
                           file=infoFp, end='')
 
                     if base == referenceBase:
@@ -696,7 +712,7 @@ class ClusterAnalysis(ReadAnalysis):
             # sequence).
             offsetsToTry = sorted(set(range(genomeLength)) - offsetsDone)
             print('\nAttempting to add bases from %d non-significant '
-                  'consensus offsets, using all reads, INCLUDING those '
+                  'consensus locations, using all reads, INCLUDING those '
                   'belonging to unused consistent components:' %
                   len(offsetsToTry), file=infoFp)
             for offset in offsetsToTry:
@@ -705,16 +721,18 @@ class ClusterAnalysis(ReadAnalysis):
                 baseCount = baseCountAtOffset[offset]
                 if baseCount:
                     base = commonest(
-                        baseCount, referenceBase, infoFp,
-                        ('    WARNING: consensus base count draw at '
-                         'offset %d' % offset) + ' %(baseCounts)s.')
-                    print('  Offset %d: %s from nucleotides %s' %
-                          (offset, base, baseCountsToStr(baseCount)),
+                        baseCount, referenceBase, drawFp=infoFp,
+                        drawMessage=(
+                            '    WARNING: consensus base count draw at '
+                            'location %d' % (offset + 1)) + ' %(baseCounts)s.')
+                    print('  Location %d: %s from nucleotides %s' %
+                          (offset + 1, base, baseCountsToStr(baseCount)),
                           file=infoFp, end='')
                 else:
                     # The reads did not cover this offset.
                     base = '-'
-                    print('  Offset %d: -' % offset, file=infoFp, end='')
+                    print('  Location %d: -' % (offset + 1), file=infoFp,
+                          end='')
 
                 if base == referenceBase:
                     print(file=infoFp)
@@ -780,6 +798,127 @@ class ClusterAnalysis(ReadAnalysis):
 
         return (consensus, unwantedReads, wantedCcReadCount,
                 wantedReadsCountAtOffset, wantedReadsBaseCountAtOffset)
+
+    def saveAlternateConsensus(
+            self, referenceId, consensusRead, baseCountAtOffset,
+            readCountAtOffset, genomeLength, outputDir):
+        """
+        Calculate and save an alternate consensus to a reference genome.
+
+        @param referenceId: The C{str} id of the reference sequence.
+        @consensusRead: The C{dark.reads.Read} consensus sequence to calculate
+            an alternative to.
+        @param baseCountAtOffset: A C{list} of C{Counter} instances giving
+            the count of each nucleotide at each genome offset.
+        @param readCountAtOffset: A C{list} of C{int} counts of the total
+            number of reads at each genome offset (i.e., just the sum of the
+            values in C{baseCountAtOffset})
+        @param genomeLength: The C{int} length of the genome the reads were
+            aligned to.
+        @param outputDir: A C{str} directory path.
+        @return: An alternate consensus C{dark.reads.Read} instance.
+        """
+        filename = join(outputDir, 'reference-alternate-consensus.txt')
+        self.report('    Writing alternate consensus info to', filename)
+        alternateConsensus = []
+
+        referenceRead = self.referenceGenomes[referenceId]
+        fields = referenceRead.id.split(maxsplit=1)
+        if len(fields) == 1:
+            referenceIdRest = ''
+        else:
+            referenceIdRest = ' ' + fields[1]
+
+        with open(filename, 'w') as infoFp:
+            print('The three nucleotides shown on each line are for the '
+                  'reference, the consensus (made by clustering) and the '
+                  'alternate nucleotide.\nThese are followed by up to two '
+                  'asterisks: the first if the alternate nucleotide does not '
+                  'agree with the reference, the second if it does not agree '
+                  'with the consensus.', file=infoFp)
+            for offset in range(genomeLength):
+                referenceBase = referenceRead.sequence[offset]
+                consensusBase = consensusRead.sequence[offset]
+                baseCount = baseCountAtOffset[offset]
+                if baseCount:
+                    if len(baseCount) == 1:
+                        # Only one nucleotide was found at this location.
+                        # The reference doesn't necessarily agree with the
+                        # consensus here, since the aligned reads may have
+                        # had a different base at this site.
+                        base = consensusBase
+                    else:
+                        # Find the nucleotide with the highest count that
+                        # is not the consensus sequence nucleotide.
+                        orderedCounts = baseCount.most_common()
+                        alternateBase, alternateCount = [
+                            x for x in orderedCounts
+                            if x[0] != consensusBase][0]
+
+                        # Check that we found a base that's not the
+                        # consensus base.
+                        assert alternateBase != consensusBase
+
+                        # If the frequency of the alternate base is high
+                        # enough, go with it. Else take the base from the
+                        # original consensus.
+                        alternateFraction = (alternateCount /
+                                             readCountAtOffset[offset])
+                        if (alternateCount > 1 and
+                                alternateFraction >
+                                self.alternateNucleotideMinFreq):
+                            base = alternateBase
+                        else:
+                            base = consensusBase
+
+                    agreeWithReference = referenceBase == base
+                    agreeWithConsensus = consensusBase == base
+                    print('Location %d: %s %s %s %s %s nucleotides %s' %
+                          (offset + 1, referenceBase, consensusBase, base,
+                           ' ' if agreeWithReference else '*',
+                           ' ' if agreeWithConsensus else '*',
+                           baseCountsToStr(baseCount)), file=infoFp)
+                else:
+                    # The reads did not cover this offset.
+                    base = '-'
+                    print('  Location %d: -' % (offset + 1), file=infoFp)
+
+                alternateConsensus.append(base)
+
+            alternateConsensusId = ('%s-alternate-consensus%s' %
+                                    (self.shortReferenceId[referenceId],
+                                     referenceIdRest))
+
+            alternateConsensusRead = Read(alternateConsensusId,
+                                          ''.join(alternateConsensus))
+
+            # Print details of the match of the alternate consensus to the
+            # reference.
+            match = compareDNAReads(referenceRead, alternateConsensusRead)
+            print('\nAlternate consensus match with reference:', file=infoFp)
+            print(matchToString(match, referenceRead, alternateConsensusRead,
+                                indent='  '), file=infoFp)
+
+            # Print details of the match of the alternate consensus to the
+            # original consensus.
+            match = compareDNAReads(consensusRead, alternateConsensusRead)
+            print('\nAlternate consensus match with original consensus:',
+                  file=infoFp)
+            print(matchToString(match, consensusRead, alternateConsensusRead,
+                                indent='  '), file=infoFp)
+
+            # Print details of the match of the original consensus to the
+            # reference.
+            match = compareDNAReads(referenceRead, consensusRead)
+            print('\nOriginal consensus match with reference:', file=infoFp)
+            print(matchToString(match, referenceRead, consensusRead,
+                                indent='  '), file=infoFp)
+
+        filename = join(outputDir, 'reference-alternate-consensus.fasta')
+        self.report('    Saving alternate consensus FASTA to', filename)
+        Reads([alternateConsensusRead]).save(filename)
+
+        return alternateConsensusRead
 
     def saveConsensusBaseFrequencyPlot(
             self, referenceId, genomeLength, baseCountAtOffset,

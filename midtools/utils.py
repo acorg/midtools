@@ -42,7 +42,7 @@ def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
     """
     Return the key of the Counter instance that is the most common.
 
-    @param counts: A C{Counter} instance.
+    @param counts: Either a C{Counter} or an C{OffsetBases} instance.
     @param drawBreaker: The nucleotide base to use if there is a draw (and
         the C{drawBreaker} nucleotide is one of the drawing best nucleotides.
     @param drawFp: A file pointer to write information about draws (if any) to.
@@ -72,7 +72,9 @@ def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
         else:
             base = orderedCounts[0][0]
 
-        if drawFp and drawMessage:
+        if drawFp:
+            # Check we also have a draw-break message.
+            assert drawMessage
             bases = baseCountsToStr(counts)
             if drawMessage.find('%(baseCounts)s') > -1:
                 print(drawMessage % {'baseCounts': bases}, file=drawFp)

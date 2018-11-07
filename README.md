@@ -173,3 +173,49 @@ calculated values.
 ## random-nt-sequence.py
 
 Print a random sequence of nucleotides.
+
+# Common parameters
+
+To all methods:
+
+`--minReads` (default=5) is the minimum number of reads that must cover a
+location for it to be considered significant.
+
+`--homogeneousCutoff` (default=0.9). If the most common nucleotide at a
+location occurs more than this fraction of the time (i.e., amongst all
+reads that cover the location) then the location will be considered
+homogeneous and therefore uninteresting.
+
+
+# Cluster analysis parameters
+
+`maxClusterDist` clustering is stopped once the minimum distance between
+the remaining clusters exceeds this value. The default value is in
+`ClusterAnalysis.DEFAULT_MAX_CLUSTER_DIST` and is currently `0.2`.  Can be
+set via `--maxClusterDist` on the command line to `bin/cluster.py`
+
+`ReadCluster.MIN_COMMONEST_MULTIPLE` is the ratio by which the count of
+most common nucleotide at a site in a cluster must exceed the count for the
+most common nucleotide at the same site in another cluster for the clusters
+to be considered a match. The clusters actually disagree, but the argument
+(for the most common nucleotide) coming from one cluster is so strong that
+we ignore the minor disagreement coming from the other. This parameter is
+used in `ReadCluster.commonNucleotidesAgreementDistance` and is currently a
+constant - its value cannot be given on the command line. The current value
+is `10`.
+
+`ReadClusters.COMMON_OFFSETS_MAX_FRACTION_MIN` is used when adjusting the
+distance between clusters given by `commonNucleotidesAgreementDistance`
+(above). The idea is that when merging clusters we want to give preferences
+to merges where the set of common sites between two clusters represents a
+high fraction of at least one cluter's overall sites.  This makes it so we
+prefer to delay on matches where (say) all 10 common sites between two
+clusters match 100% but the 10 sites are just a small fraction of both
+cluster's overall sites.  The current value is `0.9`.
+
+`alternateNucleotideMinFreq` is the (`0.0` to `1.0`) frequency that an
+alternative nucleotide (i.e., not the one chosen for a consensus) must have
+in order to be selected for the alternate consensus. Can be set via
+`--alternateNucleotideMinFreq` on the command line to `bin/cluster.py`.
+The defaut value is in `ClusterAnalysis.ALTERNATE_NUCLEOTIDE_MIN_FREQ_DEF`
+and is currently `0.15`.
