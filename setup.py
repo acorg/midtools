@@ -57,7 +57,7 @@ setup(name='midtools',
           'bin/simulation-significant-base-frequencies.sh',
       ],
       install_requires=[
-          'dark-matter>=3.0.32',
+          'dark-matter>=4.0.6',
           'plotly>=2.7.0',
           'flake8>=3.5.0',
       ])

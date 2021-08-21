@@ -411,8 +411,8 @@ def plotCoverageAndSignificantLocations(
     """
     Plot read coverage and the significant locations.
     """
-    fig = tools.make_subplots(rows=2, cols=1, subplot_titles=('a', 'b'),
-                              print_grid=False)
+    fig = tools.plotly.subplots.make_subplots(
+        rows=2, cols=1, subplot_titles=('a', 'b'), print_grid=False)
 
     plotCoverage(fig, 1, 1, readCountAtOffset, genomeLength)
 

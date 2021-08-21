@@ -198,7 +198,7 @@ class ComponentByOffsets(object):
         @param referenceSequence: The C{str} reference sequence.
         """
         ccLengths = ', '.join(
-            str(l) for l in map(len, self.consistentComponents))
+            str(length) for length in map(len, self.consistentComponents))
         print('component %d: %d reads, covering %d offsets, split into %d '
               'clusters of lengths %s.' % (
                   count, len(self), len(self.offsets),

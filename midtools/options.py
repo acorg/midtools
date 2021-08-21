@@ -74,7 +74,7 @@ def parseCommandLineOptions(args, returnSignificantOffsets=True):
         raise ValueError(
             'If you do not specify a reference sequence with '
             '--referenceId, the SAM/BAM file must contain exactly one '
-            'reference. But %s contains %d (%s).' %
+            'reference. But %s contains %d.' %
             (args.samfile, len(referenceLengths)))
 
     paddedSAM = PaddedSAM(samFilter)
