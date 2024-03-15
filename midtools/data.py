@@ -17,7 +17,7 @@ def gatherData(genomeLength, alignedReads):
     baseCountAtOffset = []
     readsAtOffset = []
 
-    nucleotides = set('ACGT')
+    nucleotides = set("ACGT")
 
     for offset in range(genomeLength):
         reads = set()
@@ -34,8 +34,9 @@ def gatherData(genomeLength, alignedReads):
     return readCountAtOffset, baseCountAtOffset, readsAtOffset
 
 
-def findSignificantOffsets(baseCountAtOffset, readCountAtOffset,
-                           minReads, homogeneousCutoff):
+def findSignificantOffsets(
+    baseCountAtOffset, readCountAtOffset, minReads, homogeneousCutoff
+):
     """
     Find the genome offsets that have significant base variability.
 
@@ -53,7 +54,10 @@ def findSignificantOffsets(baseCountAtOffset, readCountAtOffset,
     @return: A generator that yields 0-based significant offsets.
     """
     for offset, (readCount, counts) in enumerate(
-            zip(readCountAtOffset, baseCountAtOffset)):
-        if (readCount >= minReads and
-                max(counts.values()) / readCount <= homogeneousCutoff):
+        zip(readCountAtOffset, baseCountAtOffset)
+    ):
+        if (
+            readCount >= minReads
+            and max(counts.values()) / readCount <= homogeneousCutoff
+        ):
             yield offset

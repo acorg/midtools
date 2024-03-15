@@ -14,6 +14,7 @@ class DistanceCache(object):
 
     @param distFunc: A function that computes the distance between two objects.
     """
+
     def __init__(self, distFunc):
         self._distFunc = distFunc
         self._distances = defaultdict(dict)
@@ -76,8 +77,10 @@ class DistanceCache(object):
         @param pair: A 2-tuple of objects.
         @return: A Boolean indicating membership.
         """
-        return ((pair[0], pair[1]) in self._distances or
-                (pair[1], pair[0]) in self._distances)
+        return (pair[0], pair[1]) in self._distances or (
+            pair[1],
+            pair[0],
+        ) in self._distances
 
     def remove(self, a):
         """

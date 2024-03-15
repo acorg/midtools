@@ -9,11 +9,13 @@ class TestDistanceCache(TestCase):
     """
     Test the DistanceCache class.
     """
+
     def testEmpty(self):
         """
         The distance group must give a distance as provided by the distance
         function on two new elements.
         """
+
         def dist(a, b):
             return 4
 
@@ -34,11 +36,11 @@ class TestDistanceCache(TestCase):
             return 4
 
         dc = DistanceCache(dist)
-        dc.add('hey')
-        dc.add('you')
-        self.assertEqual(4, dc.distance('hey', 'you'))
+        dc.add("hey")
+        dc.add("you")
+        self.assertEqual(4, dc.distance("hey", "you"))
         self.assertEqual(1, count)
-        self.assertEqual(4, dc.distance('hey', 'you'))
+        self.assertEqual(4, dc.distance("hey", "you"))
         self.assertEqual(1, count)
 
     def testDistanceOnRemovedPair(self):
@@ -46,44 +48,47 @@ class TestDistanceCache(TestCase):
         The distance method must raise KeyError if called on a pair of objects
         that have been removed.
         """
+
         def dist(a, b):
             return 4
 
         dc = DistanceCache(dist)
-        dc.add('hey')
-        dc.add('you')
+        dc.add("hey")
+        dc.add("you")
 
-        self.assertEqual(4, dc.distance('hey', 'you'))
+        self.assertEqual(4, dc.distance("hey", "you"))
 
-        dc.remove('hey')
-        dc.remove('you')
+        dc.remove("hey")
+        dc.remove("you")
 
-        error = 'you'
-        assertRaisesRegex(self, KeyError, error, dc.distance, 'hey', 'you')
+        error = "you"
+        assertRaisesRegex(self, KeyError, error, dc.distance, "hey", "you")
 
     def testDistanceOnRemovedOneOfPair(self):
         """
         The distance method must raise KeyError if called on a pair of objects
         one of which has been removed.
         """
+
         def dist(a, b):
             return 4
 
         dc = DistanceCache(dist)
-        dc.add('hey')
-        dc.add('you')
+        dc.add("hey")
+        dc.add("you")
 
-        self.assertEqual(4, dc.distance('hey', 'you'))
+        self.assertEqual(4, dc.distance("hey", "you"))
 
-        dc.remove('you')
+        dc.remove("you")
 
-        error = 'you'
-        assertRaisesRegex(self, KeyError, error, dc.distance, 'hey', 'you')
+        error = "you"
+        assertRaisesRegex(self, KeyError, error, dc.distance, "hey", "you")
 
     def testLowestDistance(self):
         """
         The lowestDistance method must return the lowest distance.
         """
+
         def dist(a, b):
             (a, b) = sorted([a, b])
             if (a, b) == (1, 2):
@@ -93,7 +98,7 @@ class TestDistanceCache(TestCase):
             elif (a, b) == (2, 3):
                 return 6
             else:
-                raise ValueError('Oops: (%s, %s)' % (a, b))
+                raise ValueError("Oops: (%s, %s)" % (a, b))
 
         dc = DistanceCache(dist)
         dc.add(1)
@@ -106,6 +111,7 @@ class TestDistanceCache(TestCase):
         """
         The pop method must return the lowest distance pair.
         """
+
         def dist(a, b):
             (a, b) = sorted([a, b])
             if (a, b) == (1, 2):
@@ -115,7 +121,7 @@ class TestDistanceCache(TestCase):
             elif (a, b) == (2, 3):
                 return 6
             else:
-                raise ValueError('Oops: (%s, %s)' % (a, b))
+                raise ValueError("Oops: (%s, %s)" % (a, b))
 
         dc = DistanceCache(dist)
         dc.add(1)

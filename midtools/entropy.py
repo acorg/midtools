@@ -8,4 +8,4 @@ def entropy2(labels):
     return entropy(labels) / LOG2
 
 
-MAX_ENTROPY = entropy2(['a', 'b', 'c', 'd'])
+MAX_ENTROPY = entropy2(["a", "b", "c", "d"])

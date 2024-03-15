@@ -16,10 +16,16 @@ def zeroScore(_, __):
     return 0.0
 
 
-def plotConsistency(significantOffsets, baseCountAtOffset,
-                    readsAtOffset, minCommonReads, outfile, title, show):
-    """
-    """
+def plotConsistency(
+    significantOffsets,
+    baseCountAtOffset,
+    readsAtOffset,
+    minCommonReads,
+    outfile,
+    title,
+    show,
+):
+    """ """
     scores = []
     text = []
 
@@ -30,13 +36,15 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
             if offset2 == offset1:
                 rowScores.append(1.0)
                 rowText.append(
-                    '%d identity (%d read%s)' %
-                    (offset1 + 1,
-                     len(readsAtOffset[offset1]),
-                     s(len(readsAtOffset[offset1]))))
+                    "%d identity (%d read%s)"
+                    % (
+                        offset1 + 1,
+                        len(readsAtOffset[offset1]),
+                        s(len(readsAtOffset[offset1])),
+                    )
+                )
             else:
-                readsCoveringBoth = (readsAtOffset[offset1] &
-                                     readsAtOffset[offset2])
+                readsCoveringBoth = readsAtOffset[offset1] & readsAtOffset[offset2]
 
                 # print('analyzeConsistency', offset1, offset2)
                 # print('%d reads cover 1, %d cover 2, %d cover both' % (
@@ -49,13 +57,18 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
                     if commonCount < minCommonReads:
                         rowScores.append(0.0)
                         rowText.append(
-                            '%d (%d read%s) vs %d (%d read%s)<br>Too few (%d) '
-                            'reads in common' %
-                            (offset2 + 1, len(readsAtOffset[offset2]),
-                             s(len(readsAtOffset[offset2])),
-                             offset1 + 1, len(readsAtOffset[offset1]),
-                             s(len(readsAtOffset[offset1])),
-                             commonCount))
+                            "%d (%d read%s) vs %d (%d read%s)<br>Too few (%d) "
+                            "reads in common"
+                            % (
+                                offset2 + 1,
+                                len(readsAtOffset[offset2]),
+                                s(len(readsAtOffset[offset2])),
+                                offset1 + 1,
+                                len(readsAtOffset[offset1]),
+                                s(len(readsAtOffset[offset1])),
+                                commonCount,
+                            )
+                        )
                     else:
                         bases1 = []
                         bases2 = []
@@ -64,50 +77,59 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
                             bases2.append(read.base(offset2))
 
                         if offset1 == 1895 and offset2 == 1816:
-                            print('offset1 == 1896 and offset2 == 1817')
+                            print("offset1 == 1896 and offset2 == 1817")
                             print(bases1)
                             print(bases2)
                         # f = (adjusted_mutual_info_score if offset2 > offset1
                         #      else adjusted_rand_score)
-                        f = (normalized_information_distance
-                             if offset2 > offset1 else adjusted_rand_score)
+                        f = (
+                            normalized_information_distance
+                            if offset2 > offset1
+                            else adjusted_rand_score
+                        )
 
                         rowScores.append(f(bases1, bases2))
                         rowText.append(
-                            '%d (%d read%s) vs %d (%d read%s)<br>%d read%s in '
-                            'common' %
-                            (offset2 + 1, len(readsAtOffset[offset2]),
-                             s(len(readsAtOffset[offset2])),
-                             offset1 + 1, len(readsAtOffset[offset1]),
-                             s(len(readsAtOffset[offset1])),
-                             commonCount,
-                             s(commonCount)))
+                            "%d (%d read%s) vs %d (%d read%s)<br>%d read%s in "
+                            "common"
+                            % (
+                                offset2 + 1,
+                                len(readsAtOffset[offset2]),
+                                s(len(readsAtOffset[offset2])),
+                                offset1 + 1,
+                                len(readsAtOffset[offset1]),
+                                s(len(readsAtOffset[offset1])),
+                                commonCount,
+                                s(commonCount),
+                            )
+                        )
                         # print('offset %d vs %d = %.4f (%d)' %
                         # (offset1, offset2, rowScores[-1], commonCount))
                 else:
                     rowScores.append(-0.25)
-                    rowText.append('%d vs %d, no reads in common' %
-                                   (offset1 + 1, offset2 + 1))
+                    rowText.append(
+                        "%d vs %d, no reads in common" % (offset1 + 1, offset2 + 1)
+                    )
 
         scores.append(rowScores)
         text.append(rowText)
 
     data = [
         # go.Heatmap(x=x, y=x, z=scores, name='ARI'),
-        go.Heatmap(z=scores, name='ARI', text=text)  # , colorscale='Viridis'),
+        go.Heatmap(z=scores, name="ARI", text=text)  # , colorscale='Viridis'),
     ]
 
     layoutDict = dict(
         xaxis={
-            'title': 'Significant location index',
+            "title": "Significant location index",
         },
         yaxis={
-            'title': 'Score',
+            "title": "Score",
         },
     )
 
     if title:
-        layoutDict['title'] = title
+        layoutDict["title"] = title
 
     layout = go.Layout(layoutDict)
 
@@ -115,38 +137,58 @@ def plotConsistency(significantOffsets, baseCountAtOffset,
     plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description='Analyze a set of aligned reads.')
+        description="Analyze a set of aligned reads.",
+    )
 
-    addCommandLineOptions(parser, 'consistency-heatmap.html')
+    addCommandLineOptions(parser, "consistency-heatmap.html")
+
+    parser.add_argument("--title", help="The title plot")
 
     parser.add_argument(
-        '--title',
-        help='The title plot')
-
-    parser.add_argument(
-        '--minCommonReads', type=int, default=5,
-        help=('The minimum number of reads that a pair of locations must '
-              'share for them to be considered in the consistency '
-              'calculation.'))
+        "--minCommonReads",
+        type=int,
+        default=5,
+        help=(
+            "The minimum number of reads that a pair of locations must "
+            "share for them to be considered in the consistency "
+            "calculation."
+        ),
+    )
 
     args = parser.parse_args()
 
-    (genomeLength, alignedReads, paddedSAM, readCountAtOffset,
-     baseCountAtOffset, readsAtOffset, significantOffsets) = (
-         parseCommandLineOptions(args))
+    (
+        genomeLength,
+        alignedReads,
+        paddedSAM,
+        readCountAtOffset,
+        baseCountAtOffset,
+        readsAtOffset,
+        significantOffsets,
+    ) = parseCommandLineOptions(args)
 
-    print('Read %d aligned reads of length %d. '
-          'Found %d significant offsets.' %
-          (len(alignedReads), genomeLength, len(significantOffsets)))
+    print(
+        "Read %d aligned reads of length %d. "
+        "Found %d significant offsets."
+        % (len(alignedReads), genomeLength, len(significantOffsets))
+    )
 
     title = args.title or (
-        'Consistency heatmap at %d significant offsets.<br>ARI above '
-        'diagonal, NID below' % len(significantOffsets))
+        "Consistency heatmap at %d significant offsets.<br>ARI above "
+        "diagonal, NID below" % len(significantOffsets)
+    )
 
-    plotConsistency(significantOffsets, baseCountAtOffset, readsAtOffset,
-                    args.minCommonReads, args.outfile, title, args.show)
+    plotConsistency(
+        significantOffsets,
+        baseCountAtOffset,
+        readsAtOffset,
+        args.minCommonReads,
+        args.outfile,
+        title,
+        args.show,
+    )

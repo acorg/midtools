@@ -14,11 +14,10 @@ def baseCountsToStr(counts):
     if not isinstance(counts, Counter):
         counts = counts._counts
 
-    return ' '.join([
-        ('%s:%d' % (base, counts[base])) for base in sorted(counts)])
+    return " ".join([("%s:%d" % (base, counts[base])) for base in sorted(counts)])
 
 
-def nucleotidesToStr(nucleotides, prefix=''):
+def nucleotidesToStr(nucleotides, prefix=""):
     """
     Convert offsets and base counts to a string.
 
@@ -34,8 +33,8 @@ def nucleotidesToStr(nucleotides, prefix=''):
             baseCounts = baseCountsToStr(nucleotides[offset])
         else:
             baseCounts = nucleotides[offset].baseCountsToStr()
-        result.append('%s%d: %s' % (prefix, offset, baseCounts))
-    return '\n'.join(result)
+        result.append("%s%d: %s" % (prefix, offset, baseCounts))
+    return "\n".join(result)
 
 
 def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
@@ -76,10 +75,10 @@ def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
             # Check we also have a draw-break message.
             assert drawMessage
             bases = baseCountsToStr(counts)
-            if drawMessage.find('%(baseCounts)s') > -1:
-                print(drawMessage % {'baseCounts': bases}, file=drawFp)
+            if drawMessage.find("%(baseCounts)s") > -1:
+                print(drawMessage % {"baseCounts": bases}, file=drawFp)
             else:
-                print('%s\n%s' % (drawMessage, bases), file=drawFp)
+                print("%s\n%s" % (drawMessage, bases), file=drawFp)
 
         return base
     else:
@@ -96,22 +95,22 @@ def fastaIdentityTable(filename, outputFilename, verbose, filename2=None):
     @param verbose: The C{int} verbosity level.
     @param filename2: An optional second C{str} file name containing FASTA.
     """
-    colors = cl.scales['9']['seq']['GnBu']
+    colors = cl.scales["9"]["seq"]["GnBu"]
     colorArgs = []
     for i in range(7):
-        colorArgs.append('--color "%.2f %s"' %
-                         (0.65 + 0.05 * i, colors[i]))
+        colorArgs.append('--color "%.2f %s"' % (0.65 + 0.05 * i, colors[i]))
 
-    file2arg = ('--fastaFile2 "%s"' % filename2) if filename2 else ''
+    file2arg = ('--fastaFile2 "%s"' % filename2) if filename2 else ""
 
     e = Executor()
     e.execute(
-        'fasta-identity-table.py --showGaps --showLengths --footer '
-        '--removeDescriptions %s %s < %s > %s' %
-        (' '.join(colorArgs), file2arg, filename, outputFilename))
+        "fasta-identity-table.py --showGaps --showLengths --footer "
+        "--removeDescriptions %s %s < %s > %s"
+        % (" ".join(colorArgs), file2arg, filename, outputFilename)
+    )
     if verbose > 1:
         for line in e.log:
-            print('       ', line)
+            print("       ", line)
 
 
 def s(count):
@@ -122,7 +121,7 @@ def s(count):
     @return: A C{str}, either '' or 's' depending on whether the count is
         singular.
     """
-    return '' if count == 1 else 's'
+    return "" if count == 1 else "s"
 
 
 def commas(iterable):
@@ -132,7 +131,7 @@ def commas(iterable):
     @param iterable: An iterable of things to be put into the return string.
     @return: A sorted comma-separated C{str} of the things in C{iterable}.
     """
-    return ', '.join(map(str, sorted(iterable)))
+    return ", ".join(map(str, sorted(iterable)))
 
 
 def alignmentQuality(alignment):
@@ -142,5 +141,4 @@ def alignmentQuality(alignment):
     @param alignment: A C{pysam.AlignedSegment} instance.
     @return: A C{str} quality string.
     """
-    return ''.join(
-        map(lambda x: chr(x + 33), alignment.query_qualities))
+    return "".join(map(lambda x: chr(x + 33), alignment.query_qualities))

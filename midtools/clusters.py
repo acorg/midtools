@@ -23,12 +23,11 @@ class ReadCluster(object):
         return len(self.reads)
 
     def __str__(self):
-        result = ['Cluster with %d read%s:' %
-                  (len(self.reads), s(len(self.reads)))]
+        result = ["Cluster with %d read%s:" % (len(self.reads), s(len(self.reads)))]
         for read in self.reads:
-            result.append('  %s' % read)
-        result.append(nucleotidesToStr(self.nucleotides, prefix='  '))
-        return '\n'.join(result)
+            result.append("  %s" % read)
+        result.append(nucleotidesToStr(self.nucleotides, prefix="  "))
+        return "\n".join(result)
 
     def add(self, read):
         """
@@ -98,12 +97,17 @@ class ReadCluster(object):
             similarity = sum(
                 # 1.0 - OffsetBases.multiplicativeDistance(
                 #        aNucleotides[offset], bNucleotides[offset])
-                1.0 - min(
+                1.0
+                - min(
                     OffsetBases.multiplicativeDistance(
-                        aNucleotides[offset], bNucleotides[offset]),
+                        aNucleotides[offset], bNucleotides[offset]
+                    ),
                     OffsetBases.homogeneousDistance(
-                        aNucleotides[offset], bNucleotides[offset]))
-                for offset in commonOffsets)
+                        aNucleotides[offset], bNucleotides[offset]
+                    ),
+                )
+                for offset in commonOffsets
+            )
             return 1.0 - (similarity / len(commonOffsets))
         else:
             return 1.0
@@ -151,13 +155,13 @@ class ReadCluster(object):
             for offset in commonOffsets:
                 aNucleotidesAtOffset = aNucleotides[offset]
                 bNucleotidesAtOffset = bNucleotides[offset]
-                if (aNucleotidesAtOffset.commonest &
-                        bNucleotidesAtOffset.commonest):
+                if aNucleotidesAtOffset.commonest & bNucleotidesAtOffset.commonest:
                     # This is case (a) above.
                     matching += 1
                 else:
                     multiple = OffsetBases.highestFrequenciesMultiple(
-                        aNucleotidesAtOffset, bNucleotidesAtOffset)
+                        aNucleotidesAtOffset, bNucleotidesAtOffset
+                    )
                     # Sanity: the multiple cannot be None because that
                     # would mean only one nucleotide is present, and that
                     # case is dealt with by the first part of this if/then.
@@ -182,8 +186,7 @@ class ReadClusters(object):
         self._count = count()
         self.readClusters = defaultdict(ReadCluster)
         # self.distanceCache = DistanceCache(self.multiplicativeDistance)
-        self.distanceCache = DistanceCache(
-            self.commonNucleotidesAgreementDistance)
+        self.distanceCache = DistanceCache(self.commonNucleotidesAgreementDistance)
 
     def __len__(self):
         """
@@ -219,9 +222,11 @@ class ReadClusters(object):
 
         return 1.0 - (
             (1.0 - ReadCluster.commonNucleotidesAgreementDistance(a, b))
-            *
-            max(self.COMMON_OFFSETS_MAX_FRACTION_MIN,
-                ReadCluster.commonOffsetsMaxFraction(a, b)))
+            * max(
+                self.COMMON_OFFSETS_MAX_FRACTION_MIN,
+                ReadCluster.commonOffsetsMaxFraction(a, b),
+            )
+        )
 
     def multiplicativeDistance(self, a, b):
         """
@@ -238,9 +243,11 @@ class ReadClusters(object):
         # COMMON_OFFSETS_MAX_FRACTION_MIN.
         return 1.0 - (
             (1.0 - ReadCluster.commonNucleotidesMultiplicativeDistance(a, b))
-            *
-            max(self.COMMON_OFFSETS_MAX_FRACTION_MIN,
-                ReadCluster.commonOffsetsMaxFraction(a, b)))
+            * max(
+                self.COMMON_OFFSETS_MAX_FRACTION_MIN,
+                ReadCluster.commonOffsetsMaxFraction(a, b),
+            )
+        )
 
     def mergeDescription(self, a, b, distance):
         """
@@ -259,69 +266,83 @@ class ReadClusters(object):
         matches = []
         sharedCount = matchCount = 0
 
-        allOffsets = sorted(
-            set(cluster1.nucleotides) | set(cluster2.nucleotides))
+        allOffsets = sorted(set(cluster1.nucleotides) | set(cluster2.nucleotides))
 
         for offset in allOffsets:
-
             inCount = 0
 
             if offset in cluster1.nucleotides:
                 result1.append(cluster1.nucleotides[offset].baseCountsToStr())
                 inCount += 1
             else:
-                result1.append('-')
+                result1.append("-")
 
             if offset in cluster2.nucleotides:
                 result2.append(cluster2.nucleotides[offset].baseCountsToStr())
                 inCount += 1
             else:
-                result2.append('-')
+                result2.append("-")
 
             if inCount == 2:
                 sharedCount += 1
-                if (cluster1.nucleotides[offset].commonest &
-                        cluster2.nucleotides[offset].commonest):
-                    matches.append('*')
+                if (
+                    cluster1.nucleotides[offset].commonest
+                    & cluster2.nucleotides[offset].commonest
+                ):
+                    matches.append("*")
                     matchCount += 1
                 else:
                     multiple = OffsetBases.highestFrequenciesMultiple(
-                        cluster1.nucleotides[offset],
-                        cluster2.nucleotides[offset])
+                        cluster1.nucleotides[offset], cluster2.nucleotides[offset]
+                    )
                     # Sanity: the multiple cannot be None because that
                     # would mean only one nucleotide is present, and that
                     # case is dealt with by the first part of this if/then.
                     assert multiple is not None
                     if multiple >= ReadCluster.MIN_COMMONEST_MULTIPLE:
                         matchCount += 1
-                        matches.append('+')
+                        matches.append("+")
                     else:
-                        matches.append('')
+                        matches.append("")
             else:
-                matches.append('')
+                matches.append("")
 
         result1Width = max(len(line) for line in result1)
         result2Width = max(len(line) for line in result2)
 
-        return '\n'.join(
+        return "\n".join(
             [
-                ('Merging clusters %d and %d with distance %.2f' %
-                 (a, b, distance)),
-                ('Cluster %d has %d read%s, covering %d offset%s' %
-                 (a,
-                  len(cluster1.reads), s(len(cluster1.reads), ),
-                  len(cluster1.nucleotides), s(len(cluster1.nucleotides)))),
-                ('Cluster %d has %d read%s, covering %d offset%s' %
-                 (b,
-                  len(cluster2.reads), s(len(cluster2.reads)),
-                  len(cluster2.nucleotides), s(len(cluster2.nucleotides)))),
-                ('%d matches out of %d shared offsets' %
-                 (matchCount, sharedCount)),
-            ] + [
-                '  %d: %*s    %*s    %s' %
-                (offset + 1, result1Width, line1, result2Width, line2, match)
-                for (offset, line1, line2, match) in
-                zip(allOffsets, result1, result2, matches)
+                ("Merging clusters %d and %d with distance %.2f" % (a, b, distance)),
+                (
+                    "Cluster %d has %d read%s, covering %d offset%s"
+                    % (
+                        a,
+                        len(cluster1.reads),
+                        s(
+                            len(cluster1.reads),
+                        ),
+                        len(cluster1.nucleotides),
+                        s(len(cluster1.nucleotides)),
+                    )
+                ),
+                (
+                    "Cluster %d has %d read%s, covering %d offset%s"
+                    % (
+                        b,
+                        len(cluster2.reads),
+                        s(len(cluster2.reads)),
+                        len(cluster2.nucleotides),
+                        s(len(cluster2.nucleotides)),
+                    )
+                ),
+                ("%d matches out of %d shared offsets" % (matchCount, sharedCount)),
+            ]
+            + [
+                "  %d: %*s    %*s    %s"
+                % (offset + 1, result1Width, line1, result2Width, line2, match)
+                for (offset, line1, line2, match) in zip(
+                    allOffsets, result1, result2, matches
+                )
             ]
         )
 
@@ -344,70 +365,95 @@ class ReadClusters(object):
         matches = []
         sharedCount = matchCount = 0
 
-        allOffsets = sorted(
-            set(cluster1.nucleotides) | set(cluster2.nucleotides))
+        allOffsets = sorted(set(cluster1.nucleotides) | set(cluster2.nucleotides))
 
         for offset in allOffsets:
-
             inCount = 0
 
             if offset in cluster1.nucleotides:
                 result1.append(cluster1.nucleotides[offset].baseCountsToStr())
                 inCount += 1
             else:
-                result1.append('-')
+                result1.append("-")
 
             if offset in cluster2.nucleotides:
                 result2.append(cluster2.nucleotides[offset].baseCountsToStr())
                 inCount += 1
             else:
-                result2.append('-')
+                result2.append("-")
 
             if inCount == 2:
                 sharedCount += 1
-                if (cluster1.nucleotides[offset].commonest &
-                        cluster2.nucleotides[offset].commonest):
-                    matches.append('*')
+                if (
+                    cluster1.nucleotides[offset].commonest
+                    & cluster2.nucleotides[offset].commonest
+                ):
+                    matches.append("*")
                     matchCount += 1
                 else:
-                    matches.append('')
+                    matches.append("")
 
                 offsetScores.append(
-                    '%.3f' % min(
+                    "%.3f"
+                    % min(
                         OffsetBases.multiplicativeDistance(
-                            cluster1.nucleotides[offset],
-                            cluster2.nucleotides[offset]),
+                            cluster1.nucleotides[offset], cluster2.nucleotides[offset]
+                        ),
                         OffsetBases.homogeneousDistance(
-                            cluster1.nucleotides[offset],
-                            cluster2.nucleotides[offset])))
+                            cluster1.nucleotides[offset], cluster2.nucleotides[offset]
+                        ),
+                    )
+                )
             else:
-                matches.append('')
-                offsetScores.append('')
+                matches.append("")
+                offsetScores.append("")
 
         result1Width = max(len(line) for line in result1)
         result2Width = max(len(line) for line in result2)
         offsetScoresWidth = max(len(line) for line in offsetScores)
 
-        return '\n'.join(
+        return "\n".join(
             [
-                ('Merging clusters %d and %d with distance %.2f' %
-                 (a, b, distance)),
-                ('Cluster %d has %d read%s, covering %d offset%s' %
-                 (a,
-                  len(cluster1.reads), s(len(cluster1.reads), ),
-                  len(cluster1.nucleotides), s(len(cluster1.nucleotides)))),
-                ('Cluster %d has %d read%s, covering %d offset%s' %
-                 (b,
-                  len(cluster2.reads), s(len(cluster2.reads)),
-                  len(cluster2.nucleotides), s(len(cluster2.nucleotides)))),
-                ('%d matches out of %d shared offsets' %
-                 (matchCount, sharedCount)),
-            ] + [
-                '  %d: %*s    %*s    %*s    %s' %
-                (offset + 1, result1Width, line1, result2Width, line2,
-                 offsetScoresWidth, offsetScore, match)
-                for (offset, line1, line2, offsetScore, match) in
-                zip(allOffsets, result1, result2, offsetScores, matches)
+                ("Merging clusters %d and %d with distance %.2f" % (a, b, distance)),
+                (
+                    "Cluster %d has %d read%s, covering %d offset%s"
+                    % (
+                        a,
+                        len(cluster1.reads),
+                        s(
+                            len(cluster1.reads),
+                        ),
+                        len(cluster1.nucleotides),
+                        s(len(cluster1.nucleotides)),
+                    )
+                ),
+                (
+                    "Cluster %d has %d read%s, covering %d offset%s"
+                    % (
+                        b,
+                        len(cluster2.reads),
+                        s(len(cluster2.reads)),
+                        len(cluster2.nucleotides),
+                        s(len(cluster2.nucleotides)),
+                    )
+                ),
+                ("%d matches out of %d shared offsets" % (matchCount, sharedCount)),
+            ]
+            + [
+                "  %d: %*s    %*s    %*s    %s"
+                % (
+                    offset + 1,
+                    result1Width,
+                    line1,
+                    result2Width,
+                    line2,
+                    offsetScoresWidth,
+                    offsetScore,
+                    match,
+                )
+                for (offset, line1, line2, offsetScore, match) in zip(
+                    allOffsets, result1, result2, offsetScores, matches
+                )
             ]
         )
 
@@ -424,7 +470,7 @@ class ReadClusters(object):
             merged.
         """
         if fp:
-            print('Starting cluster analysis on %d reads' % len(self), file=fp)
+            print("Starting cluster analysis on %d reads" % len(self), file=fp)
 
         for a in self.readClusters:
             self.distanceCache.add(a)
@@ -452,26 +498,40 @@ class ReadClusters(object):
             del self.readClusters[b]
 
             if fp:
-                print('New cluster (%d) has %d reads and covers %d offsets. '
-                      'Remaining cluster count: %d.' %
-                      (count, len(self.readClusters[count].reads),
-                       len(self.readClusters[count].nucleotides), len(self)),
-                      file=fp)
+                print(
+                    "New cluster (%d) has %d reads and covers %d offsets. "
+                    "Remaining cluster count: %d."
+                    % (
+                        count,
+                        len(self.readClusters[count].reads),
+                        len(self.readClusters[count].nucleotides),
+                        len(self),
+                    ),
+                    file=fp,
+                )
 
         if fp:
             if lowestDistance is None:
-                print('Distance priority queue is empty, all reads '
-                      'are now in one cluster.', file=fp)
+                print(
+                    "Distance priority queue is empty, all reads "
+                    "are now in one cluster.",
+                    file=fp,
+                )
             else:
-                print('The lowest inter-cluster distance has risen '
-                      'to %.2f, which exceeds the %.2f cutoff value. '
-                      '%d unmerged clusters remain.' %
-                      (lowestDistance, cutoff, len(self.readClusters)),
-                      file=fp)
+                print(
+                    "The lowest inter-cluster distance has risen "
+                    "to %.2f, which exceeds the %.2f cutoff value. "
+                    "%d unmerged clusters remain."
+                    % (lowestDistance, cutoff, len(self.readClusters)),
+                    file=fp,
+                )
 
                 # Print the remaining inter-cluster distances.
-                print('\nThe remaining cluster differences that were too '
-                      'distant to qualify are:', file=fp)
+                print(
+                    "\nThe remaining cluster differences that were too "
+                    "distant to qualify are:",
+                    file=fp,
+                )
 
                 while True:
                     lowestDistance = self.distanceCache.lowestDistance()
@@ -485,6 +545,6 @@ class ReadClusters(object):
                     print(self.mergeDescription(a, b, lowestDistance), file=fp)
 
         if fp:
-            print('End of cluster analysis.', file=fp)
+            print("End of cluster analysis.", file=fp)
 
         return self.readClusters.values()

@@ -1,7 +1,7 @@
 from random import uniform, choice
 
 
-def mutateRead(read, rate, alphabet='ACGT'):
+def mutateRead(read, rate, alphabet="ACGT"):
     """
     Mutate the bases of a read.
 
@@ -29,6 +29,6 @@ def mutateRead(read, rate, alphabet='ACGT'):
         else:
             newSequence.append(base)
 
-    read.sequence = ''.join(newSequence)
+    read.sequence = "".join(newSequence)
 
     return mutatedOffsets

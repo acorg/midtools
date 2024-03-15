@@ -12,6 +12,7 @@ class AlignedRead(Read):
         C{dark.sam.PaddedSAM.queries}).
     @param alignment: An optional C{pysam.AlignedSegment} instance.
     """
+
     def __init__(self, id_, sequence, alignment=None):
         self.significantOffsets = OrderedDict()
         self._originalLength = len(sequence)
@@ -20,18 +21,18 @@ class AlignedRead(Read):
         # Scan the sequence for initial gaps.
         offset = 0
         for base in sequence:
-            if base == '-':
+            if base == "-":
                 offset += 1
             else:
                 break
 
         if offset == len(sequence):
-            raise ValueError('Read is all gaps.')
+            raise ValueError("Read is all gaps.")
 
         # Scan for final gaps.
         trailing = 0
         for base in sequence[::-1]:
-            if base == '-':
+            if base == "-":
                 trailing += 1
             else:
                 break
@@ -40,20 +41,24 @@ class AlignedRead(Read):
         assert offset + trailing < len(sequence)
         self.offset = offset
 
-        Read.__init__(self, id_,
-                      sequence[offset:len(sequence) - trailing].upper())
+        Read.__init__(self, id_, sequence[offset : len(sequence) - trailing].upper())
 
     def __str__(self):
         if self.significantOffsets:
-            bases = ', bases %s, offsets (total %d): %s' % (
-                ''.join(self.significantOffsets.values()),
+            bases = ", bases %s, offsets (total %d): %s" % (
+                "".join(self.significantOffsets.values()),
                 len(self.significantOffsets),
-                ','.join(map(str, self.significantOffsets)))
+                ",".join(map(str, self.significantOffsets)),
+            )
         else:
-            bases = ''
+            bases = ""
 
-        return '<AlignedRead: (offset %4d, len %2d%s) %s>' % (
-            self.offset, len(self), bases, self.id)
+        return "<AlignedRead: (offset %4d, len %2d%s) %s>" % (
+            self.offset,
+            len(self),
+            bases,
+            self.id,
+        )
 
     def __lt__(self, other):
         """
@@ -84,7 +89,7 @@ class AlignedRead(Read):
             otherBase = getOtherBase(offset)
             if otherBase:
                 sharedCount += 1
-                identicalCount += (otherBase == base)
+                identicalCount += otherBase == base
         if sharedCount:
             return (identicalCount / sharedCount) >= agreementFraction
         else:
@@ -118,7 +123,7 @@ class AlignedRead(Read):
         offset = self.offset
         if n >= offset and n < offset + len(self):
             b = self.sequence[n - offset]
-            return None if b == '-' else b
+            return None if b == "-" else b
 
     def trim(self, n):
         """
@@ -128,9 +133,9 @@ class AlignedRead(Read):
         @return: A C{bool} to indicate whether the trimming was performed or
             not (due to the read being too short).
         """
-        assert n >= 0, ('Trim amount (%d) cannot be negative.' % n)
+        assert n >= 0, "Trim amount (%d) cannot be negative." % n
         if 2 * n < len(self):
-            self.sequence = self.sequence[n:len(self) - n]
+            self.sequence = self.sequence[n : len(self) - n]
             self.offset += n
             return True
         else:
@@ -140,8 +145,9 @@ class AlignedRead(Read):
         """
         Make a FASTA string for the read, including its original gaps.
         """
-        return '>%s\n%s%s%s\n' % (
+        return ">%s\n%s%s%s\n" % (
             self.id,
-            '-' * self.offset,
+            "-" * self.offset,
             self.sequence,
-            '-' * (self._originalLength - self.offset - len(self.sequence)))
+            "-" * (self._originalLength - self.offset - len(self.sequence)),
+        )

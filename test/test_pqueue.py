@@ -9,12 +9,13 @@ class TestPriorityQueue(TestCase):
     """
     Test the PriorityQueue class.
     """
+
     def testLowestPriorityRaisesOnEmpty(self):
         """
         The lowestPriority method must raise a KeyError if the queue is empty.
         """
         pq = PriorityQueue()
-        error = 'peek on an empty priority queue'
+        error = "peek on an empty priority queue"
         assertRaisesRegex(self, KeyError, error, pq.lowestPriority)
 
     def testPopRaisesOnEmpty(self):
@@ -22,7 +23,7 @@ class TestPriorityQueue(TestCase):
         The pop method must raise a KeyError if the queue is empty.
         """
         pq = PriorityQueue()
-        error = 'pop from an empty priority queue'
+        error = "pop from an empty priority queue"
         assertRaisesRegex(self, KeyError, error, pq.pop)
 
     def testEmptyLength(self):
@@ -54,9 +55,9 @@ class TestPriorityQueue(TestCase):
         The __contains__ function must work as expected.
         """
         pq = PriorityQueue()
-        pq.add('hey')
-        self.assertTrue('hey' in pq)
-        self.assertFalse('hi' in pq)
+        pq.add("hey")
+        self.assertTrue("hey" in pq)
+        self.assertFalse("hi" in pq)
 
     def testBooleanWhenEmpty(self):
         """
@@ -78,18 +79,18 @@ class TestPriorityQueue(TestCase):
         The queue pop method must return the lowest priority item.
         """
         pq = PriorityQueue()
-        pq.add('hey', 9)
-        pq.add('you', 7)
-        pq.add('two', 8)
-        self.assertEqual('you', pq.pop())
+        pq.add("hey", 9)
+        pq.add("you", 7)
+        pq.add("two", 8)
+        self.assertEqual("you", pq.pop())
 
     def testRemove(self):
         """
         The remove method must work as expected.
         """
         pq = PriorityQueue()
-        pq.add('hey')
-        pq.remove('hey')
+        pq.add("hey")
+        pq.remove("hey")
         self.assertFalse(pq)
         self.assertEqual(0, len(pq))
 
@@ -99,8 +100,8 @@ class TestPriorityQueue(TestCase):
         disturbing the length of the queue.
         """
         pq = PriorityQueue()
-        pq.add('hey', 9)
-        pq.add('you', 7)
-        pq.add('two', 8)
+        pq.add("hey", 9)
+        pq.add("you", 7)
+        pq.add("two", 8)
         self.assertEqual(7, pq.lowestPriority())
         self.assertEqual(3, len(pq))

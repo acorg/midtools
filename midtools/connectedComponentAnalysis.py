@@ -15,8 +15,14 @@ from midtools.data import gatherData, findSignificantOffsets
 from midtools.match import matchToString
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.utils import (
-    baseCountsToStr, nucleotidesToStr, commonest, fastaIdentityTable, s,
-    commas, alignmentQuality)
+    baseCountsToStr,
+    nucleotidesToStr,
+    commonest,
+    fastaIdentityTable,
+    s,
+    commas,
+    alignmentQuality,
+)
 
 
 def connectedComponentsByOffset(significantReads, threshold):
@@ -57,6 +63,7 @@ class ConsistentComponent(object):
     Hold information about a set of reads that share significant offsets
     and which (largely) agree on the nucleotides present at those offsets.
     """
+
     def __init__(self, reads, nucleotides):
         self.reads = reads
         self.nucleotides = nucleotides
@@ -71,7 +78,7 @@ class ConsistentComponent(object):
         @param fp: A file pointer to write to.
         """
         for read in sorted(self.reads):
-            print(read.toString('fasta'), end='', file=fp)
+            print(read.toString("fasta"), end="", file=fp)
 
     def savePaddedFasta(self, fp):
         """
@@ -80,7 +87,7 @@ class ConsistentComponent(object):
         @param fp: A file pointer to write to.
         """
         for read in sorted(self.reads):
-            print(read.toPaddedString(), end='', file=fp)
+            print(read.toPaddedString(), end="", file=fp)
 
     def consensusSequence(self, componentOffsets, infoFp):
         """
@@ -97,13 +104,15 @@ class ConsistentComponent(object):
         for offset in sorted(componentOffsets):
             if offset in self.nucleotides:
                 base = commonest(
-                    self.nucleotides[offset], infoFp,
-                    'WARNING: consensus draw at offset %d' % offset +
-                    ' %(baseCounts)s.')
+                    self.nucleotides[offset],
+                    infoFp,
+                    "WARNING: consensus draw at offset %d" % offset
+                    + " %(baseCounts)s.",
+                )
             else:
-                base = '-'
+                base = "-"
             sequence.append(base)
-        return ''.join(sequence)
+        return "".join(sequence)
 
     def saveConsensus(self, count, componentOffsets, consensusFp, infoFp):
         """
@@ -119,24 +128,37 @@ class ConsistentComponent(object):
         @param drawFp: A file pointer to write draw (and other) info to.
         """
         print(
-            Read('consistent-component-%d-consensus (based on %d reads)' %
-                 (count, len(self.reads)),
-                 self.consensusSequence(
-                     componentOffsets, infoFp)).toString('fasta'),
-            file=consensusFp, end='')
+            Read(
+                "consistent-component-%d-consensus (based on %d reads)"
+                % (count, len(self.reads)),
+                self.consensusSequence(componentOffsets, infoFp),
+            ).toString("fasta"),
+            file=consensusFp,
+            end="",
+        )
 
     def summarize(self, fp, count, componentOffsets):
         plural = s(len(self.reads))
-        print('    Consistent component %d: %d read%s, covering %d offset%s' %
-              (count, len(self.reads), plural, len(self.nucleotides),
-               s(len(self.nucleotides))), file=fp)
-        print('    Nucleotide counts for each offset:', file=fp)
-        print(nucleotidesToStr(self.nucleotides, '      '), file=fp)
-        print('    Consensus sequence: %s' %
-              self.consensusSequence(componentOffsets, fp), file=fp)
-        print('    Read%s:' % plural, file=fp)
+        print(
+            "    Consistent component %d: %d read%s, covering %d offset%s"
+            % (
+                count,
+                len(self.reads),
+                plural,
+                len(self.nucleotides),
+                s(len(self.nucleotides)),
+            ),
+            file=fp,
+        )
+        print("    Nucleotide counts for each offset:", file=fp)
+        print(nucleotidesToStr(self.nucleotides, "      "), file=fp)
+        print(
+            "    Consensus sequence: %s" % self.consensusSequence(componentOffsets, fp),
+            file=fp,
+        )
+        print("    Read%s:" % plural, file=fp)
         for read in sorted(self.reads):
-            print('     ', read, file=fp)
+            print("     ", read, file=fp)
 
 
 class ComponentByOffsets(object):
@@ -146,6 +168,7 @@ class ComponentByOffsets(object):
     of subsets of these reads (ConsistentComponent instances) that are
     consistent in the nucleotides at their offsets.
     """
+
     def __init__(self, reads, offsets, threshold):
         self.reads = reads
         self.offsets = offsets
@@ -159,18 +182,27 @@ class ComponentByOffsets(object):
     def _check(self):
         selfReads = len(self)
         ccReads = sum(map(len, self.consistentComponents))
-        assert selfReads == ccReads, '%d != %d' % (selfReads, ccReads)
+        assert selfReads == ccReads, "%d != %d" % (selfReads, ccReads)
 
     def summarize(self, fp, count):
-        ccLengths = ', '.join(
-            str(length) for length in map(len, self.consistentComponents))
-        print('component %d: %d reads, covering %d offsets, split into %d '
-              'consistent sub-components of lengths %s.' % (
-                  count, len(self), len(self.offsets),
-                  len(self.consistentComponents), ccLengths), file=fp)
-        print('  offsets:', commas(self.offsets), file=fp)
+        ccLengths = ", ".join(
+            str(length) for length in map(len, self.consistentComponents)
+        )
+        print(
+            "component %d: %d reads, covering %d offsets, split into %d "
+            "consistent sub-components of lengths %s."
+            % (
+                count,
+                len(self),
+                len(self.offsets),
+                len(self.consistentComponents),
+                ccLengths,
+            ),
+            file=fp,
+        )
+        print("  offsets:", commas(self.offsets), file=fp)
         for read in sorted(self.reads):
-            print('  ', read, file=fp)
+            print("  ", read, file=fp)
 
         for i, cc in enumerate(self.consistentComponents, start=1):
             print(file=fp)
@@ -178,19 +210,19 @@ class ComponentByOffsets(object):
 
     def saveFasta(self, outputDir, count, verbose):
         for i, cc in enumerate(self.consistentComponents, start=1):
-            filename = join(outputDir, 'component-%d-%d.fasta' % (count, i))
+            filename = join(outputDir, "component-%d-%d.fasta" % (count, i))
             if verbose > 1:
-                print('      Saving component %d %d FASTA to' % (count, i),
-                      filename)
-            with open(filename, 'w') as fp:
+                print("      Saving component %d %d FASTA to" % (count, i), filename)
+            with open(filename, "w") as fp:
                 cc.saveFasta(fp)
 
-            filename = join(outputDir, 'component-%d-%d-padded.fasta' %
-                            (count, i))
+            filename = join(outputDir, "component-%d-%d-padded.fasta" % (count, i))
             if verbose > 1:
-                print('      Saving component %d %d padded FASTA to' %
-                      (count, i), filename)
-            with open(filename, 'w') as fp:
+                print(
+                    "      Saving component %d %d padded FASTA to" % (count, i),
+                    filename,
+                )
+            with open(filename, "w") as fp:
                 cc.savePaddedFasta(fp)
 
     def findConsistentComponents(self):
@@ -278,31 +310,35 @@ class ComponentByOffsets(object):
             yield ConsistentComponent(ccReads, nucleotides)
 
     def saveConsensuses(self, outputDir, count, verbose):
-        consensusFilename = join(
-            outputDir, 'component-%d-consensuses.fasta' % count)
-        infoFilename = join(
-            outputDir, 'component-%d-consensuses.txt' % count)
+        consensusFilename = join(outputDir, "component-%d-consensuses.fasta" % count)
+        infoFilename = join(outputDir, "component-%d-consensuses.txt" % count)
         if verbose:
-            print('      Saving component %d consensus FASTA to %s\n'
-                  '      Saving component %d consensus info to %s' %
-                  (count, consensusFilename, count, infoFilename))
-        with open(consensusFilename, 'w') as consensusFp, open(
-                infoFilename, 'w') as infoFp:
+            print(
+                "      Saving component %d consensus FASTA to %s\n"
+                "      Saving component %d consensus info to %s"
+                % (count, consensusFilename, count, infoFilename)
+            )
+        with open(consensusFilename, "w") as consensusFp, open(
+            infoFilename, "w"
+        ) as infoFp:
             # First write the reference sequence for this component.
             (reference,) = list(
-                FastaReads(join(outputDir,
-                                'reference-component-%d.fasta' % count)))
-            print(reference.toString('fasta'), file=consensusFp, end='')
+                FastaReads(join(outputDir, "reference-component-%d.fasta" % count))
+            )
+            print(reference.toString("fasta"), file=consensusFp, end="")
             for i, cc in enumerate(self.consistentComponents, start=1):
                 cc.saveConsensus(i, self.offsets, consensusFp, infoFp)
 
         # Write out an HTML table showing the identity between the various
         # component consensuses.
         identityTableFilename = join(
-            outputDir, 'component-%d-consensuses-identity.html' % count)
+            outputDir, "component-%d-consensuses-identity.html" % count
+        )
         if verbose:
-            print('      Saving component %d consensus identity table to %s' %
-                  (count, identityTableFilename))
+            print(
+                "      Saving component %d consensus identity table to %s"
+                % (count, identityTableFilename)
+            )
 
         fastaIdentityTable(consensusFilename, identityTableFilename, verbose)
 
@@ -338,20 +374,34 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         input but with just the signifcant locations.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
     """
+
     DEFAULT_AGREEMENT_THRESHOLD = 0.5
 
-    def __init__(self, alignmentFiles, referenceGenomeFiles, referenceIds=None,
-                 outputDir=None, minReads=ReadAnalysis.DEFAULT_MIN_READS,
-                 homogeneousCutoff=ReadAnalysis.DEFAULT_HOMOGENEOUS_CUTOFF,
-                 agreementThreshold=DEFAULT_AGREEMENT_THRESHOLD,
-                 saveReducedFASTA=False, plotSAM=False, verbose=0):
-
+    def __init__(
+        self,
+        alignmentFiles,
+        referenceGenomeFiles,
+        referenceIds=None,
+        outputDir=None,
+        minReads=ReadAnalysis.DEFAULT_MIN_READS,
+        homogeneousCutoff=ReadAnalysis.DEFAULT_HOMOGENEOUS_CUTOFF,
+        agreementThreshold=DEFAULT_AGREEMENT_THRESHOLD,
+        saveReducedFASTA=False,
+        plotSAM=False,
+        verbose=0,
+    ):
         ReadAnalysis.__init__(
-            self, alignmentFiles, referenceGenomeFiles,
+            self,
+            alignmentFiles,
+            referenceGenomeFiles,
             referenceIds=referenceIds,
-            outputDir=outputDir, minReads=minReads,
-            homogeneousCutoff=homogeneousCutoff, plotSAM=plotSAM,
-            saveReducedFASTA=saveReducedFASTA, verbose=verbose)
+            outputDir=outputDir,
+            minReads=minReads,
+            homogeneousCutoff=homogeneousCutoff,
+            plotSAM=plotSAM,
+            saveReducedFASTA=saveReducedFASTA,
+            verbose=verbose,
+        )
 
         self.agreementThreshold = agreementThreshold
 
@@ -365,8 +415,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             shortAlignmentFilename = self.shortAlignmentFilename[alignmentFile]
             alignmentOutputDir = join(self.outputDir, shortAlignmentFilename)
 
-            self._writeAlignmentHTMLSummary(results[alignmentFile],
-                                            alignmentOutputDir)
+            self._writeAlignmentHTMLSummary(results[alignmentFile], alignmentOutputDir)
 
         return results
 
@@ -384,73 +433,119 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             C{referenceId}.
         """
         analysis = self.initialReferenceIdAnalysis(
-             referenceId, alignmentFile, outputDir)
+            referenceId, alignmentFile, outputDir
+        )
 
         if analysis:
-            (genomeLength, alignedReads, readCountAtOffset,
-             baseCountAtOffset, readsAtOffset, significantOffsets,
-             samFilter, paddedSAM) = analysis
+            (
+                genomeLength,
+                alignedReads,
+                readCountAtOffset,
+                baseCountAtOffset,
+                readsAtOffset,
+                significantOffsets,
+                samFilter,
+                paddedSAM,
+            ) = analysis
         else:
             return
 
-        components = self.findConnectedComponents(alignedReads,
-                                                  significantOffsets)
+        components = self.findConnectedComponents(alignedReads, significantOffsets)
         self.saveComponentFasta(components, outputDir)
 
-        self.summarize(alignedReads, significantOffsets, components,
-                       genomeLength, outputDir)
+        self.summarize(
+            alignedReads, significantOffsets, components, genomeLength, outputDir
+        )
 
         self.saveReferenceComponents(referenceId, components, outputDir)
 
         self.saveComponentConsensuses(components, outputDir)
 
-        (consensusRead, bestCcIndices, unwantedReads, wantedCcReadCount,
-         consensusReadCountAtOffset,
-         consensusWantedReadsBaseCountAtOffset) = (
-             self.saveClosestReferenceConsensus(
-                 referenceId, components, baseCountAtOffset, genomeLength,
-                 alignedReads, paddedSAM.referenceInsertions, outputDir))
+        (
+            consensusRead,
+            bestCcIndices,
+            unwantedReads,
+            wantedCcReadCount,
+            consensusReadCountAtOffset,
+            consensusWantedReadsBaseCountAtOffset,
+        ) = self.saveClosestReferenceConsensus(
+            referenceId,
+            components,
+            baseCountAtOffset,
+            genomeLength,
+            alignedReads,
+            paddedSAM.referenceInsertions,
+            outputDir,
+        )
 
         unwantedCount, unalignedCount = self.saveNonConsensusReads(
-            unwantedReads, alignmentFile, referenceId, outputDir)
+            unwantedReads, alignmentFile, referenceId, outputDir
+        )
 
         # Sanity check.
-        if (wantedCcReadCount + unwantedCount + unalignedCount ==
-                len(samFilter.queryIds)):
+        if wantedCcReadCount + unwantedCount + unalignedCount == len(
+            samFilter.queryIds
+        ):
             self.report(
-                '    All alignment file reads accounted for: '
-                'wantedCcReadCount (%d) + unwantedCount (%d) + '
-                'unalignedCount (%d) == SAM query count (%d)' %
-                (wantedCcReadCount, unwantedCount, unalignedCount,
-                 len(samFilter.queryIds)))
+                "    All alignment file reads accounted for: "
+                "wantedCcReadCount (%d) + unwantedCount (%d) + "
+                "unalignedCount (%d) == SAM query count (%d)"
+                % (
+                    wantedCcReadCount,
+                    unwantedCount,
+                    unalignedCount,
+                    len(samFilter.queryIds),
+                )
+            )
         else:
             raise ValueError(
-                'Not all alignment file reads accounted for: '
-                'wantedCcReadCount (%d) + unwantedCount (%d) + '
-                'unalignedCount (%d) != SAM query count (%d)' %
-                (wantedCcReadCount, unwantedCount, unalignedCount,
-                 len(samFilter.queryIds)))
+                "Not all alignment file reads accounted for: "
+                "wantedCcReadCount (%d) + unwantedCount (%d) + "
+                "unalignedCount (%d) != SAM query count (%d)"
+                % (
+                    wantedCcReadCount,
+                    unwantedCount,
+                    unalignedCount,
+                    len(samFilter.queryIds),
+                )
+            )
 
         self.plotConsistentComponents(
-            referenceId, alignmentFile, genomeLength, components,
-            significantOffsets, outputDir)
+            referenceId,
+            alignmentFile,
+            genomeLength,
+            components,
+            significantOffsets,
+            outputDir,
+        )
 
         self.saveConsensusSAM(
-            alignmentFile, set(alignedReads) - unwantedReads, outputDir)
+            alignmentFile, set(alignedReads) - unwantedReads, outputDir
+        )
 
         self.saveConsensusBaseFrequencyPlot(
-            referenceId, genomeLength, consensusWantedReadsBaseCountAtOffset,
-            consensusReadCountAtOffset, outputDir)
+            referenceId,
+            genomeLength,
+            consensusWantedReadsBaseCountAtOffset,
+            consensusReadCountAtOffset,
+            outputDir,
+        )
 
         self.saveBestNonReferenceConsensus(
-            referenceId, components, baseCountAtOffset, genomeLength,
-            alignedReads, paddedSAM.referenceInsertions, bestCcIndices,
-            outputDir)
+            referenceId,
+            components,
+            baseCountAtOffset,
+            genomeLength,
+            alignedReads,
+            paddedSAM.referenceInsertions,
+            bestCcIndices,
+            outputDir,
+        )
 
         return {
-            'consensusRead': consensusRead,
-            'components': components,
-            'significantOffsets': significantOffsets,
+            "consensusRead": consensusRead,
+            "components": components,
+            "significantOffsets": significantOffsets,
         }
 
     def findConnectedComponents(self, alignedReads, significantOffsets):
@@ -461,13 +556,12 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         @param significantOffsets: A C{set} of signifcant offsets.
         @return: A C{list} of C{connectedComponentsByOffset} instances.
         """
-        significantReads = set(read for read in alignedReads
-                               if read.significantOffsets)
+        significantReads = set(read for read in alignedReads if read.significantOffsets)
         components = []
         for count, component in enumerate(
-                connectedComponentsByOffset(significantReads,
-                                            self.agreementThreshold),
-                start=1):
+            connectedComponentsByOffset(significantReads, self.agreementThreshold),
+            start=1,
+        ):
             components.append(component)
 
         # Sanity check: The significantReads set should be be empty
@@ -481,7 +575,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
 
         @param outputDir: A C{str} directory path.
         """
-        self.report('    Saving component FASTA')
+        self.report("    Saving component FASTA")
         for count, component in enumerate(components, start=1):
             component.saveFasta(outputDir, count, self.verbose)
 
@@ -496,17 +590,21 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         """
         reference = self.referenceGenomes[referenceId]
         for count, component in enumerate(components, start=1):
-            filename = join(outputDir, 'reference-component-%d.fasta' % count)
-            self.report('    Saving reference component %d to %s' %
-                        (count, filename))
-            read = Read(reference.id + '-component-%d' % count,
-                        reference.sequence)
+            filename = join(outputDir, "reference-component-%d.fasta" % count)
+            self.report("    Saving reference component %d to %s" % (count, filename))
+            read = Read(reference.id + "-component-%d" % count, reference.sequence)
 
             Reads([read]).filter(keepSites=component.offsets).save(filename)
 
     def plotConsistentComponents(
-            self, referenceId, alignmentFile, genomeLength, components,
-            significantOffsets, outputDir):
+        self,
+        referenceId,
+        alignmentFile,
+        genomeLength,
+        components,
+        significantOffsets,
+        outputDir,
+    ):
         """
         Make a plot of all consistent connected components.
 
@@ -517,19 +615,33 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         @param significantOffsets: A C{set} of signifcant offsets.
         @param outputDir: A C{str} directory path.
         """
-        filename = join(outputDir, 'consistent-components-plot.html')
-        self.report('    Plotting consistent connected components.')
-        infoFilename = join(outputDir, 'consistent-components-plot.txt')
+        filename = join(outputDir, "consistent-components-plot.html")
+        self.report("    Plotting consistent connected components.")
+        infoFilename = join(outputDir, "consistent-components-plot.txt")
         plotConsistentComponents(
-            referenceId, genomeLength, components, significantOffsets,
-            filename, infoFilename, outputDir, titleFontSize=17,
+            referenceId,
+            genomeLength,
+            components,
+            significantOffsets,
+            filename,
+            infoFilename,
+            outputDir,
+            titleFontSize=17,
             axisFontSize=15,
-            title='%s consistent connected components<br>from file %s' %
-            (referenceId, self.shortAlignmentFilename[alignmentFile]))
+            title="%s consistent connected components<br>from file %s"
+            % (referenceId, self.shortAlignmentFilename[alignmentFile]),
+        )
 
     def saveClosestReferenceConsensus(
-            self, referenceId, components, baseCountAtOffset, genomeLength,
-            alignedReads, referenceInsertions, outputDir):
+        self,
+        referenceId,
+        components,
+        baseCountAtOffset,
+        genomeLength,
+        alignedReads,
+        referenceInsertions,
+        outputDir,
+    ):
         """
         Calculate and save the best consensus to a reference genome.
 
@@ -572,11 +684,15 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             nucleotides = cc.nucleotides
             count = 0
             for offset in nucleotides:
-                message = drawMessage + (
-                    ' offset %d: base counts' % offset) + ' %(baseCounts)s.'
+                message = (
+                    drawMessage
+                    + (" offset %d: base counts" % offset)
+                    + " %(baseCounts)s."
+                )
                 referenceBase = referenceSequence[offset]
-                componentBase = commonest(nucleotides[offset], referenceBase,
-                                          drawFp, message)
+                componentBase = commonest(
+                    nucleotides[offset], referenceBase, drawFp, message
+                )
                 count += int(componentBase == referenceBase)
             return count
 
@@ -609,81 +725,109 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                 # its covered offsets and which covers all the offset in
                 # the ComponentByOffsets will have a score of 1.0
                 matchCount = ccMatchCount(
-                    cc, reference, fp,
-                    '    Consistent component %d base draw' % (index + 1))
-                print('  Consistent component %d (%d reads) has %d exact '
-                      'matches with the reference, out of the %d offsets it '
-                      'covers (%.2f%%).'
-                      % (index + 1, len(cc.reads), matchCount,
-                         len(cc.nucleotides),
-                         matchCount / len(cc.nucleotides) * 100.0),
-                      file=fp)
+                    cc,
+                    reference,
+                    fp,
+                    "    Consistent component %d base draw" % (index + 1),
+                )
+                print(
+                    "  Consistent component %d (%d reads) has %d exact "
+                    "matches with the reference, out of the %d offsets it "
+                    "covers (%.2f%%)."
+                    % (
+                        index + 1,
+                        len(cc.reads),
+                        matchCount,
+                        len(cc.nucleotides),
+                        matchCount / len(cc.nucleotides) * 100.0,
+                    ),
+                    file=fp,
+                )
                 score = matchCount / offsetCount
                 if score == bestScore:
-                    print('    WARNING: Consistent component %d has a score '
-                          '(%.2f) draw with consistent component %d' %
-                          (index + 1, score, bestIndex + 1), file=fp)
+                    print(
+                        "    WARNING: Consistent component %d has a score "
+                        "(%.2f) draw with consistent component %d"
+                        % (index + 1, score, bestIndex + 1),
+                        file=fp,
+                    )
                 elif score > bestScore:
                     bestScore = score
                     bestIndex = index
 
-            print('  The best consistent component is number %d.' %
-                  (bestIndex + 1), file=fp)
+            print(
+                "  The best consistent component is number %d." % (bestIndex + 1),
+                file=fp,
+            )
 
             return bestIndex
 
         reference = self.referenceGenomes[referenceId]
         fields = reference.id.split(maxsplit=1)
         if len(fields) == 1:
-            referenceIdRest = ''
+            referenceIdRest = ""
         else:
-            referenceIdRest = ' ' + fields[1]
+            referenceIdRest = " " + fields[1]
 
-        infoFile = join(outputDir, 'consensus.txt')
-        self.report('    Saving closest consensus to reference info to',
-                    infoFile)
+        infoFile = join(outputDir, "consensus.txt")
+        self.report("    Saving closest consensus to reference info to", infoFile)
 
-        with open(infoFile, 'w') as infoFp:
+        with open(infoFile, "w") as infoFp:
             offsetsDone = set()
             consensus = [None] * genomeLength
             bestCcIndices = []
             for count, component in enumerate(components, start=1):
-                print('\nExamining component %d with %d offsets: %s' %
-                      (count, len(component.offsets),
-                       commas(component.offsets)), file=infoFp)
-                bestCcIndex = bestConsistentComponent(component, reference,
-                                                      infoFp)
+                print(
+                    "\nExamining component %d with %d offsets: %s"
+                    % (count, len(component.offsets), commas(component.offsets)),
+                    file=infoFp,
+                )
+                bestCcIndex = bestConsistentComponent(component, reference, infoFp)
                 bestCcIndices.append(bestCcIndex)
                 bestCc = component.consistentComponents[bestCcIndex]
-                print('  Adding best nucleotides to consensus:',
-                      file=infoFp)
+                print("  Adding best nucleotides to consensus:", file=infoFp)
                 for offset in sorted(bestCc.nucleotides):
                     assert consensus[offset] is None
                     referenceBase = reference.sequence[offset]
                     base = commonest(
-                        bestCc.nucleotides[offset], referenceBase, infoFp,
-                        ('      WARNING: base count draw at offset %d ' %
-                         offset) + ' %(baseCounts)s.')
+                        bestCc.nucleotides[offset],
+                        referenceBase,
+                        infoFp,
+                        ("      WARNING: base count draw at offset %d " % offset)
+                        + " %(baseCounts)s.",
+                    )
                     consensus[offset] = base
                     offsetsDone.add(offset)
 
                     # Do some reporting on the base just added.
                     if base == referenceBase:
-                        mismatch = ''
+                        mismatch = ""
                     else:
                         consensusBase = commonest(
-                            baseCountAtOffset[offset], referenceBase, infoFp,
-                            ('      WARNING: consensus base count draw at '
-                             'offset %d ' % offset) + ' %(baseCounts)s.')
+                            baseCountAtOffset[offset],
+                            referenceBase,
+                            infoFp,
+                            (
+                                "      WARNING: consensus base count draw at "
+                                "offset %d " % offset
+                            )
+                            + " %(baseCounts)s.",
+                        )
                         mismatch = (
-                            ' (mismatch: reference has %s, all-read '
-                            'consensus has %s)' % (referenceBase,
-                                                   consensusBase))
+                            " (mismatch: reference has %s, all-read "
+                            "consensus has %s)" % (referenceBase, consensusBase)
+                        )
 
-                    print('    Offset %d: %s from nucleotides %s%s' %
-                          (offset, base,
-                           baseCountsToStr(bestCc.nucleotides[offset]),
-                           mismatch), file=infoFp)
+                    print(
+                        "    Offset %d: %s from nucleotides %s%s"
+                        % (
+                            offset,
+                            base,
+                            baseCountsToStr(bestCc.nucleotides[offset]),
+                            mismatch,
+                        ),
+                        file=infoFp,
+                    )
 
             # Make two sets of reads: 1) of all the reads in the wanted
             # consistent components, and 2) all the reads in the unwanted
@@ -705,44 +849,56 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             # aligned reads minus the reads we don't want because they're
             # in a consistent component that is not the best for this
             # reference sequence.
-            (consensusReadCountAtOffset,
-             consensusWantedReadsBaseCountAtOffset, _) = gatherData(
-                 genomeLength, set(alignedReads) - unwantedCcReads)
+            (
+                consensusReadCountAtOffset,
+                consensusWantedReadsBaseCountAtOffset,
+                _,
+            ) = gatherData(genomeLength, set(alignedReads) - unwantedCcReads)
 
-            depthFile = join(outputDir, 'consensus-depth.txt')
-            self.report('    Writing consensus depth information to',
-                        depthFile)
-            with open(depthFile, 'w') as depthFp:
+            depthFile = join(outputDir, "consensus-depth.txt")
+            self.report("    Writing consensus depth information to", depthFile)
+            with open(depthFile, "w") as depthFp:
                 for offset in range(genomeLength):
-                    print(offset + 1, consensusReadCountAtOffset[offset],
-                          file=depthFp)
+                    print(offset + 1, consensusReadCountAtOffset[offset], file=depthFp)
 
             # Fill in (from the overall read consensus) the offsets that
             # were not significant in any connected component, based only
             # on reads that were in the chosen consistent components.
             offsetsToTry = sorted(set(range(genomeLength)) - offsetsDone)
-            print('\nAdding bases from %d non-connected-component '
-                  'consensus offsets, EXCLUDING reads belonging to '
-                  'non-optimal consistent components:' % len(offsetsToTry),
-                  file=infoFp)
+            print(
+                "\nAdding bases from %d non-connected-component "
+                "consensus offsets, EXCLUDING reads belonging to "
+                "non-optimal consistent components:" % len(offsetsToTry),
+                file=infoFp,
+            )
             for offset in offsetsToTry:
                 assert consensus[offset] is None
                 baseCount = consensusWantedReadsBaseCountAtOffset[offset]
                 if baseCount:
                     referenceBase = reference.sequence[offset]
                     base = commonest(
-                        baseCount, referenceBase, infoFp,
-                        ('    WARNING: consensus base count draw at '
-                         'offset %d' % offset) + ' %(baseCounts)s.')
-                    print('  Offset %d: %s from nucleotides %s' %
-                          (offset, base, baseCountsToStr(baseCount)),
-                          file=infoFp, end='')
+                        baseCount,
+                        referenceBase,
+                        infoFp,
+                        (
+                            "    WARNING: consensus base count draw at "
+                            "offset %d" % offset
+                        )
+                        + " %(baseCounts)s.",
+                    )
+                    print(
+                        "  Offset %d: %s from nucleotides %s"
+                        % (offset, base, baseCountsToStr(baseCount)),
+                        file=infoFp,
+                        end="",
+                    )
 
                     if base == referenceBase:
                         print(file=infoFp)
                     else:
-                        print(' (mismatch: reference has %s)' % referenceBase,
-                              file=infoFp)
+                        print(
+                            " (mismatch: reference has %s)" % referenceBase, file=infoFp
+                        )
                     consensus[offset] = base
                     offsetsDone.add(offset)
 
@@ -752,96 +908,122 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             # This is the best we can do with these remaining offsets (as
             # opposed to getting gaps).
             offsetsToTry = sorted(set(range(genomeLength)) - offsetsDone)
-            print('\nAdding bases from %d non-connected-component '
-                  'consensus offsets, INCLUDING from reads belonging to '
-                  'non-optimal consistent components:' % len(offsetsToTry),
-                  file=infoFp)
+            print(
+                "\nAdding bases from %d non-connected-component "
+                "consensus offsets, INCLUDING from reads belonging to "
+                "non-optimal consistent components:" % len(offsetsToTry),
+                file=infoFp,
+            )
             for offset in offsetsToTry:
                 assert consensus[offset] is None
                 referenceBase = reference.sequence[offset]
                 baseCount = baseCountAtOffset[offset]
                 if baseCount:
                     base = commonest(
-                        baseCount, referenceBase, infoFp,
-                        ('    WARNING: consensus base count draw at '
-                         'offset %d' % offset) + ' %(baseCounts)s.')
-                    print('  Offset %d: %s from nucleotides %s' %
-                          (offset, base, baseCountsToStr(baseCount)),
-                          file=infoFp, end='')
+                        baseCount,
+                        referenceBase,
+                        infoFp,
+                        (
+                            "    WARNING: consensus base count draw at "
+                            "offset %d" % offset
+                        )
+                        + " %(baseCounts)s.",
+                    )
+                    print(
+                        "  Offset %d: %s from nucleotides %s"
+                        % (offset, base, baseCountsToStr(baseCount)),
+                        file=infoFp,
+                        end="",
+                    )
                 else:
                     # The reads did not cover this offset.
-                    base = '-'
-                    print('  Offset %d: -' % offset, file=infoFp, end='')
+                    base = "-"
+                    print("  Offset %d: -" % offset, file=infoFp, end="")
 
                 if base == referenceBase:
                     print(file=infoFp)
                 else:
-                    print(' (mismatch: reference has %s)' % referenceBase,
-                          file=infoFp)
+                    print(" (mismatch: reference has %s)" % referenceBase, file=infoFp)
                 consensus[offset] = base
                 offsetsDone.add(offset)
 
             # Sanity check: make sure we processed all offsets.
             assert offsetsDone == set(range(genomeLength))
 
-            consensusId = (
-                '%s-consensus-ccc best-consistent-components:%s%s' %
-                (self.shortReferenceId[referenceId],
-                 ','.join(map(str, bestCcIndices)), referenceIdRest))
+            consensusId = "%s-consensus-ccc best-consistent-components:%s%s" % (
+                self.shortReferenceId[referenceId],
+                ",".join(map(str, bestCcIndices)),
+                referenceIdRest,
+            )
 
-            consensus = Read(consensusId, ''.join(consensus))
+            consensus = Read(consensusId, "".join(consensus))
 
             # Print details of the match of the consensus to the reference.
             match = compareDNAReads(reference, consensus)
-            print('\nOVERALL match with reference:', file=infoFp)
-            print(matchToString(match, reference, consensus, indent='  '),
-                  file=infoFp)
+            print("\nOVERALL match with reference:", file=infoFp)
+            print(matchToString(match, reference, consensus, indent="  "), file=infoFp)
 
             # Print any insertions to the reference.
-            wantedReadsWithInsertions = (
-                set(referenceInsertions) &
-                (set(alignedReads) - unwantedCcReads))
+            wantedReadsWithInsertions = set(referenceInsertions) & (
+                set(alignedReads) - unwantedCcReads
+            )
             if wantedReadsWithInsertions:
-                print('\nReference insertions present in %d read%s:' % (
-                    len(wantedReadsWithInsertions),
-                    s(len(wantedReadsWithInsertions))), file=infoFp)
+                print(
+                    "\nReference insertions present in %d read%s:"
+                    % (
+                        len(wantedReadsWithInsertions),
+                        s(len(wantedReadsWithInsertions)),
+                    ),
+                    file=infoFp,
+                )
                 nucleotides = defaultdict(Counter)
                 for readId in wantedReadsWithInsertions:
-                    for (offset, sequence) in referenceInsertions[readId]:
+                    for offset, sequence in referenceInsertions[readId]:
                         for index, base in enumerate(sequence):
                             nucleotides[offset + index][base] += 1
-                print(nucleotidesToStr(nucleotides, prefix='  '), file=infoFp)
+                print(nucleotidesToStr(nucleotides, prefix="  "), file=infoFp)
             else:
-                print('\nReference insertions: none.', file=infoFp)
+                print("\nReference insertions: none.", file=infoFp)
 
-        filename = join(outputDir, 'reference-consensus.fasta')
-        self.report('    Saving consensus to', filename)
+        filename = join(outputDir, "reference-consensus.fasta")
+        self.report("    Saving consensus to", filename)
         Reads([consensus]).save(filename)
 
         wantedCcReadCount = 0
-        filename = join(outputDir, 'cc-wanted.fastq')
-        with open(filename, 'w') as fp:
+        filename = join(outputDir, "cc-wanted.fastq")
+        with open(filename, "w") as fp:
             for wantedCcRead in wantedCcReads:
                 alignment = wantedCcRead.alignment
                 if not (alignment.is_secondary or alignment.is_supplementary):
                     wantedCcReadCount += 1
                     print(
-                        Read(alignment.query_name,
-                             alignment.query_sequence,
-                             alignmentQuality(alignment)).toString('fastq'),
-                        end='', file=fp)
+                        Read(
+                            alignment.query_name,
+                            alignment.query_sequence,
+                            alignmentQuality(alignment),
+                        ).toString("fastq"),
+                        end="",
+                        file=fp,
+                    )
         self.report(
-            '    Saved %d read%s wanted in consistent connected components '
-            'to %s' % (wantedCcReadCount, s(wantedCcReadCount), filename))
+            "    Saved %d read%s wanted in consistent connected components "
+            "to %s" % (wantedCcReadCount, s(wantedCcReadCount), filename)
+        )
 
         unwantedReads = set(alignedReads) - wantedCcReads
 
-        return (consensus, bestCcIndices, unwantedReads, wantedCcReadCount,
-                consensusReadCountAtOffset,
-                consensusWantedReadsBaseCountAtOffset)
+        return (
+            consensus,
+            bestCcIndices,
+            unwantedReads,
+            wantedCcReadCount,
+            consensusReadCountAtOffset,
+            consensusWantedReadsBaseCountAtOffset,
+        )
 
-    def saveNonConsensusReads(self, unwantedReads, alignmentFile, referenceId,
-                              outputDir):
+    def saveNonConsensusReads(
+        self, unwantedReads, alignmentFile, referenceId, outputDir
+    ):
         """
         Save the unwanted (those not from the best consistent connected
         components used to make the consensus) reads as FASTQ.
@@ -862,21 +1044,23 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             else:
                 id_ = alignment.query_name
                 if id_ in seenIds:
-                    raise ValueError('Already seen %s' % id_)
+                    raise ValueError("Already seen %s" % id_)
 
                 seenIds.add(id_)
 
                 print(
-                    Read(id_, alignment.query_sequence,
-                         alignmentQuality(alignment)).toString('fastq'),
-                    file=fp, end='')
+                    Read(
+                        id_, alignment.query_sequence, alignmentQuality(alignment)
+                    ).toString("fastq"),
+                    file=fp,
+                    end="",
+                )
                 return 1
 
-        filename = join(outputDir, 'non-consensus-reads.fastq')
-        self.report('    Saving unwanted (non-consensus) reads to',
-                    filename)
+        filename = join(outputDir, "non-consensus-reads.fastq")
+        self.report("    Saving unwanted (non-consensus) reads to", filename)
 
-        with open(filename, 'w') as fp:
+        with open(filename, "w") as fp:
             # Write out the reads that aligned to the reference but which
             # we don't want because they were in consistent connected
             # components that weren't the best for the reference.
@@ -894,16 +1078,30 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                         unalignedCount += save(alignment, fp)
 
         self.report(
-            '      Wrote %d read%s from %s that mapped to %s (but were '
-            'unwanted) and %d that did not' %
-            (unwantedCount, s(unwantedCount),
-             alignmentFile, referenceId, unalignedCount))
+            "      Wrote %d read%s from %s that mapped to %s (but were "
+            "unwanted) and %d that did not"
+            % (
+                unwantedCount,
+                s(unwantedCount),
+                alignmentFile,
+                referenceId,
+                unalignedCount,
+            )
+        )
 
         return unwantedCount, unalignedCount
 
     def saveBestNonReferenceConsensus(
-            self, referenceId, components, baseCountAtOffset, genomeLength,
-            alignedReads, referenceInsertions, referenceCcIndices, outputDir):
+        self,
+        referenceId,
+        components,
+        baseCountAtOffset,
+        genomeLength,
+        alignedReads,
+        referenceInsertions,
+        referenceCcIndices,
+        outputDir,
+    ):
         """
         Calculate and save the best consensus that does not include the
         consistent components that were chosen for the consensus against the
@@ -947,16 +1145,24 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             if len(component.consistentComponents) == 1:
                 assert referenceCcIndex == 0
                 cc = component.consistentComponents[0]
-                print('  There is only one consistent connected component! '
-                      'The non-reference consensus will be the same as the '
-                      'reference consensus for this set of signifcant '
-                      'offsets.', file=fp)
-                print('  Consistent component 1 (%d reads) has %d offsets '
-                      'of the %d offsets in the connected component (%.2f%%).'
-                      % (len(cc.reads), len(cc.nucleotides),
-                         offsetCount,
-                         len(cc.nucleotides) / offsetCount * 100.0),
-                      file=fp)
+                print(
+                    "  There is only one consistent connected component! "
+                    "The non-reference consensus will be the same as the "
+                    "reference consensus for this set of signifcant "
+                    "offsets.",
+                    file=fp,
+                )
+                print(
+                    "  Consistent component 1 (%d reads) has %d offsets "
+                    "of the %d offsets in the connected component (%.2f%%)."
+                    % (
+                        len(cc.reads),
+                        len(cc.nucleotides),
+                        offsetCount,
+                        len(cc.nucleotides) / offsetCount * 100.0,
+                    ),
+                    file=fp,
+                )
                 return 0
 
             # The bestScore tuple will hold the fraction of the connected
@@ -967,81 +1173,111 @@ class ConnectedComponentAnalysis(ReadAnalysis):
 
             for index, cc in enumerate(component.consistentComponents):
                 if index == referenceCcIndex:
-                    print('  Ignoring reference consistent component %d.' %
-                          (referenceCcIndex + 1), file=fp)
+                    print(
+                        "  Ignoring reference consistent component %d."
+                        % (referenceCcIndex + 1),
+                        file=fp,
+                    )
                     continue
                 fraction = len(cc.nucleotides) / offsetCount
-                print('  Consistent component %d (%d reads) has %d offsets '
-                      'of the %d offsets in the connected component (%.2f%%).'
-                      % (index + 1, len(cc.reads), len(cc.nucleotides),
-                         offsetCount,
-                         len(cc.nucleotides) / offsetCount * 100.0),
-                      file=fp)
+                print(
+                    "  Consistent component %d (%d reads) has %d offsets "
+                    "of the %d offsets in the connected component (%.2f%%)."
+                    % (
+                        index + 1,
+                        len(cc.reads),
+                        len(cc.nucleotides),
+                        offsetCount,
+                        len(cc.nucleotides) / offsetCount * 100.0,
+                    ),
+                    file=fp,
+                )
                 score = (fraction, len(cc.reads))
                 if score == bestScore:
-                    print('    WARNING: Consistent component %d has a score '
-                          '(%.2f) and read count (%d) draw with consistent '
-                          'component %d' %
-                          (index + 1, fraction, score[1], bestIndex + 1),
-                          file=fp)
+                    print(
+                        "    WARNING: Consistent component %d has a score "
+                        "(%.2f) and read count (%d) draw with consistent "
+                        "component %d" % (index + 1, fraction, score[1], bestIndex + 1),
+                        file=fp,
+                    )
                 elif score > bestScore:
                     bestScore = score
                     bestIndex = index
 
-            print('  The best non-reference consistent component is number '
-                  '%d.' % (bestIndex + 1), file=fp)
+            print(
+                "  The best non-reference consistent component is number "
+                "%d." % (bestIndex + 1),
+                file=fp,
+            )
 
             return bestIndex
 
         reference = self.referenceGenomes[referenceId]
         fields = reference.id.split(maxsplit=1)
         if len(fields) == 1:
-            referenceIdRest = ''
+            referenceIdRest = ""
         else:
-            referenceIdRest = ' ' + fields[1]
+            referenceIdRest = " " + fields[1]
 
-        infoFile = join(outputDir, 'non-reference-consensus.txt')
-        self.report('    Saving info on best non-reference consensus to',
-                    infoFile)
+        infoFile = join(outputDir, "non-reference-consensus.txt")
+        self.report("    Saving info on best non-reference consensus to", infoFile)
 
-        with open(infoFile, 'w') as infoFp:
+        with open(infoFile, "w") as infoFp:
             offsetsDone = set()
             consensus = [None] * genomeLength
             bestCcIndices = []
             for count, (referenceCcIndex, component) in enumerate(
-                    zip(referenceCcIndices, components), start=1):
-                print('\nExamining component %d with %d offsets: %s' %
-                      (count, len(component.offsets),
-                       commas(component.offsets)), file=infoFp)
+                zip(referenceCcIndices, components), start=1
+            ):
+                print(
+                    "\nExamining component %d with %d offsets: %s"
+                    % (count, len(component.offsets), commas(component.offsets)),
+                    file=infoFp,
+                )
                 bestCcIndex = bestConsistentComponent(
-                    component, referenceCcIndex, infoFp)
+                    component, referenceCcIndex, infoFp
+                )
                 bestCcIndices.append(bestCcIndex)
                 bestCc = component.consistentComponents[bestCcIndex]
-                print('  Adding best nucleotides to consensus:',
-                      file=infoFp)
+                print("  Adding best nucleotides to consensus:", file=infoFp)
                 for offset in sorted(bestCc.nucleotides):
                     assert consensus[offset] is None
                     referenceBase = reference.sequence[offset]
                     base = commonest(
-                        bestCc.nucleotides[offset], referenceBase, infoFp,
-                        ('    WARNING: base count draw at offset %d ' %
-                         offset) + ' %(baseCounts)s.')
+                        bestCc.nucleotides[offset],
+                        referenceBase,
+                        infoFp,
+                        ("    WARNING: base count draw at offset %d " % offset)
+                        + " %(baseCounts)s.",
+                    )
                     if base == referenceBase:
-                        mismatch = ''
+                        mismatch = ""
                     else:
                         consensusBase = commonest(
-                            baseCountAtOffset[offset], referenceBase, infoFp,
-                            ('    WARNING: consensus base count draw at '
-                             'offset %d ' % offset) + ' %(baseCounts)s.')
+                            baseCountAtOffset[offset],
+                            referenceBase,
+                            infoFp,
+                            (
+                                "    WARNING: consensus base count draw at "
+                                "offset %d " % offset
+                            )
+                            + " %(baseCounts)s.",
+                        )
                         mismatch = (
-                            ' (mismatch: reference has %s, all-read '
-                            'consensus has %s)' % (referenceBase,
-                                                   consensusBase))
+                            " (mismatch: reference has %s, all-read "
+                            "consensus has %s)" % (referenceBase, consensusBase)
+                        )
 
-                    print('    Offset %d: %s from nucleotides %s%s' %
-                          (offset, base,
-                           baseCountsToStr(bestCc.nucleotides[offset]),
-                           mismatch), file=infoFp)
+                    print(
+                        "    Offset %d: %s from nucleotides %s%s"
+                        % (
+                            offset,
+                            base,
+                            baseCountsToStr(bestCc.nucleotides[offset]),
+                            mismatch,
+                        ),
+                        file=infoFp,
+                    )
 
                     consensus[offset] = base
                     offsetsDone.add(offset)
@@ -1066,43 +1302,56 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             # aligned reads minus the reads we don't want because they're
             # in a consistent component that is not the best for this
             # non-reference sequence.
-            consensusReadCountAtOffset, wantedReadBaseCountAtOffset, _ = (
-                gatherData(genomeLength, set(alignedReads) - unwantedCcReads))
+            consensusReadCountAtOffset, wantedReadBaseCountAtOffset, _ = gatherData(
+                genomeLength, set(alignedReads) - unwantedCcReads
+            )
 
-            depthFile = join(outputDir, 'non-reference-consensus-depth.txt')
-            self.report('    Writing non-reference consensus depth '
-                        'information to', depthFile)
-            with open(depthFile, 'w') as depthFp:
+            depthFile = join(outputDir, "non-reference-consensus-depth.txt")
+            self.report(
+                "    Writing non-reference consensus depth " "information to", depthFile
+            )
+            with open(depthFile, "w") as depthFp:
                 for offset in range(genomeLength):
-                    print(offset + 1, consensusReadCountAtOffset[offset],
-                          file=depthFp)
+                    print(offset + 1, consensusReadCountAtOffset[offset], file=depthFp)
 
             # Fill in (from the overall read consensus) the offsets that
             # were not significant in any connected component, based only
             # on reads that were in the chosen consistent components.
             offsetsToTry = sorted(set(range(genomeLength)) - offsetsDone)
-            print('\nAdding bases from %d non-connected-component '
-                  'consensus offsets, EXCLUDING reads belonging to '
-                  'non-optimal consistent components:' % len(offsetsToTry),
-                  file=infoFp)
+            print(
+                "\nAdding bases from %d non-connected-component "
+                "consensus offsets, EXCLUDING reads belonging to "
+                "non-optimal consistent components:" % len(offsetsToTry),
+                file=infoFp,
+            )
             for offset in offsetsToTry:
                 assert consensus[offset] is None
                 baseCount = wantedReadBaseCountAtOffset[offset]
                 if baseCount:
                     referenceBase = reference.sequence[offset]
                     base = commonest(
-                        baseCount, referenceBase, infoFp,
-                        ('    WARNING: consensus base count draw at '
-                         'offset %d' % offset) + ' %(baseCounts)s.')
-                    print('  Offset %d: %s from nucleotides %s' %
-                          (offset, base, baseCountsToStr(baseCount)),
-                          file=infoFp, end='')
+                        baseCount,
+                        referenceBase,
+                        infoFp,
+                        (
+                            "    WARNING: consensus base count draw at "
+                            "offset %d" % offset
+                        )
+                        + " %(baseCounts)s.",
+                    )
+                    print(
+                        "  Offset %d: %s from nucleotides %s"
+                        % (offset, base, baseCountsToStr(baseCount)),
+                        file=infoFp,
+                        end="",
+                    )
 
                     if base == referenceBase:
                         print(file=infoFp)
                     else:
-                        print(' (mismatch: reference has %s)' % referenceBase,
-                              file=infoFp)
+                        print(
+                            " (mismatch: reference has %s)" % referenceBase, file=infoFp
+                        )
                     consensus[offset] = base
                     offsetsDone.add(offset)
 
@@ -1112,32 +1361,42 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             # This is the best we can do with these remaining offsets (as
             # opposed to getting gaps).
             offsetsToTry = sorted(set(range(genomeLength)) - offsetsDone)
-            print('\nAdding bases from %d non-connected-component '
-                  'consensus offsets, INCLUDING from reads belonging to '
-                  'non-optimal consistent components:' % len(offsetsToTry),
-                  file=infoFp)
+            print(
+                "\nAdding bases from %d non-connected-component "
+                "consensus offsets, INCLUDING from reads belonging to "
+                "non-optimal consistent components:" % len(offsetsToTry),
+                file=infoFp,
+            )
             for offset in offsetsToTry:
                 assert consensus[offset] is None
                 referenceBase = reference.sequence[offset]
                 baseCount = baseCountAtOffset[offset]
                 if baseCount:
                     base = commonest(
-                        baseCount, referenceBase, infoFp,
-                        ('    WARNING: consensus base count draw at '
-                         'offset %d' % offset) + ' %(baseCounts)s.')
-                    print('  Offset %d: %s from nucleotides %s' %
-                          (offset, base, baseCountsToStr(baseCount)),
-                          file=infoFp, end='')
+                        baseCount,
+                        referenceBase,
+                        infoFp,
+                        (
+                            "    WARNING: consensus base count draw at "
+                            "offset %d" % offset
+                        )
+                        + " %(baseCounts)s.",
+                    )
+                    print(
+                        "  Offset %d: %s from nucleotides %s"
+                        % (offset, base, baseCountsToStr(baseCount)),
+                        file=infoFp,
+                        end="",
+                    )
                 else:
                     # The reads did not cover this offset.
-                    base = '-'
-                    print('  Offset %d: -' % offset, file=infoFp, end='')
+                    base = "-"
+                    print("  Offset %d: -" % offset, file=infoFp, end="")
 
                 if base == referenceBase:
                     print(file=infoFp)
                 else:
-                    print(' (mismatch: reference has %s)' % referenceBase,
-                          file=infoFp)
+                    print(" (mismatch: reference has %s)" % referenceBase, file=infoFp)
                 consensus[offset] = base
                 offsetsDone.add(offset)
 
@@ -1145,38 +1404,46 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             assert offsetsDone == set(range(genomeLength))
 
             consensusId = (
-                '%s-non-reference-consensus-ccc '
-                'best-consistent-components:%s%s' %
-                (self.shortReferenceId[referenceId],
-                 ','.join(map(str, bestCcIndices)), referenceIdRest))
+                "%s-non-reference-consensus-ccc "
+                "best-consistent-components:%s%s"
+                % (
+                    self.shortReferenceId[referenceId],
+                    ",".join(map(str, bestCcIndices)),
+                    referenceIdRest,
+                )
+            )
 
-            consensus = Read(consensusId, ''.join(consensus))
+            consensus = Read(consensusId, "".join(consensus))
 
             # Print details of the match of the non-reference consensus to
             # the reference.
             match = compareDNAReads(reference, consensus)
-            print('\nOVERALL match with reference:', file=infoFp)
-            print(matchToString(match, reference, consensus, indent='  '),
-                  file=infoFp)
+            print("\nOVERALL match with reference:", file=infoFp)
+            print(matchToString(match, reference, consensus, indent="  "), file=infoFp)
 
             # Print any insertions to the reference.
-            wantedReadsWithInsertions = (
-                set(referenceInsertions) &
-                (set(alignedReads) - unwantedCcReads))
+            wantedReadsWithInsertions = set(referenceInsertions) & (
+                set(alignedReads) - unwantedCcReads
+            )
             if wantedReadsWithInsertions:
-                print('\nReference insertions present in %d read%s:' % (
-                    len(wantedReadsWithInsertions),
-                    s(len(wantedReadsWithInsertions))), file=infoFp)
+                print(
+                    "\nReference insertions present in %d read%s:"
+                    % (
+                        len(wantedReadsWithInsertions),
+                        s(len(wantedReadsWithInsertions)),
+                    ),
+                    file=infoFp,
+                )
                 nucleotides = defaultdict(Counter)
                 for readId in wantedReadsWithInsertions:
-                    for (offset, sequence) in referenceInsertions[readId]:
+                    for offset, sequence in referenceInsertions[readId]:
                         for index, base in enumerate(sequence):
                             nucleotides[offset + index][base] += 1
-                print(nucleotidesToStr(nucleotides, prefix='  '), file=infoFp)
+                print(nucleotidesToStr(nucleotides, prefix="  "), file=infoFp)
             else:
-                print('\nReference insertions: none.', file=infoFp)
+                print("\nReference insertions: none.", file=infoFp)
 
-        filename = join(outputDir, 'non-reference-consensus.fasta')
+        filename = join(outputDir, "non-reference-consensus.fasta")
         Reads([consensus]).save(filename)
 
         return consensus
@@ -1189,17 +1456,17 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         @param wantedReads: A C{set} of wanted C{AlignedRead} instances.
         @param outputDir: A C{str} directory path.
         """
-        filename = join(outputDir, 'reference-consensus.sam')
-        self.report('    Writing consensus SAM to', filename)
+        filename = join(outputDir, "reference-consensus.sam")
+        self.report("    Writing consensus SAM to", filename)
         with samfile(alignmentFile) as sam:
-            alignment = AlignmentFile(filename, mode='w', template=sam)
+            alignment = AlignmentFile(filename, mode="w", template=sam)
         save = alignment.write
         for read in wantedReads:
             save(read.alignment)
 
     def saveConsensusBaseFrequencyPlot(
-            self, referenceId, genomeLength, baseCountAtOffset,
-            readCountAtOffset, outputDir):
+        self, referenceId, genomeLength, baseCountAtOffset, readCountAtOffset, outputDir
+    ):
         """
         Make a plot of the sorted base frequencies for the consensus.
 
@@ -1213,18 +1480,29 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             values in C{baseCountAtOffset})
         @param outputDir: A C{str} directory path.
         """
-        filename = join(outputDir, 'consensus-base-frequencies.html')
-        self.report('    Writing consensus base frequency plot to', filename)
+        filename = join(outputDir, "consensus-base-frequencies.html")
+        self.report("    Writing consensus base frequency plot to", filename)
 
-        significantOffsets = list(findSignificantOffsets(
-            baseCountAtOffset, readCountAtOffset, self.minReads,
-            self.homogeneousCutoff))
+        significantOffsets = list(
+            findSignificantOffsets(
+                baseCountAtOffset,
+                readCountAtOffset,
+                self.minReads,
+                self.homogeneousCutoff,
+            )
+        )
 
         plotBaseFrequencies(
-            significantOffsets, baseCountAtOffset, readCountAtOffset, filename,
-            title='%s consensus (length %d)' % (referenceId, genomeLength),
-            minReads=self.minReads, homogeneousCutoff=self.homogeneousCutoff,
-            histogram=False, show=False)
+            significantOffsets,
+            baseCountAtOffset,
+            readCountAtOffset,
+            filename,
+            title="%s consensus (length %d)" % (referenceId, genomeLength),
+            minReads=self.minReads,
+            homogeneousCutoff=self.homogeneousCutoff,
+            histogram=False,
+            show=False,
+        )
 
     def saveComponentConsensuses(self, components, outputDir):
         """
@@ -1233,12 +1511,13 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         @param components: A C{list} of C{ComponentByOffsets} instances.
         @param outputDir: A C{str} directory path.
         """
-        self.report('    Saving component consensuses')
+        self.report("    Saving component consensuses")
         for count, component in enumerate(components, start=1):
             component.saveConsensuses(outputDir, count, self.verbose)
 
-    def summarize(self, alignedReads, significantOffsets, components,
-                  genomeLength, outputDir):
+    def summarize(
+        self, alignedReads, significantOffsets, components, genomeLength, outputDir
+    ):
         """
         Write out an analysis summary.
 
@@ -1249,50 +1528,59 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             aligned to.
         @param outputDir: A C{str} directory path.
         """
-        filename = join(outputDir, 'component-summary.txt')
-        self.report('    Writing analysis summary to', filename)
+        filename = join(outputDir, "component-summary.txt")
+        self.report("    Writing analysis summary to", filename)
 
-        with open(filename, 'w') as fp:
+        with open(filename, "w") as fp:
+            print(
+                "Read %d aligned reads of length %d. "
+                "Found %d significant locations."
+                % (len(alignedReads), genomeLength, len(significantOffsets)),
+                file=fp,
+            )
 
-            print('Read %d aligned reads of length %d. '
-                  'Found %d significant locations.' %
-                  (len(alignedReads), genomeLength,
-                   len(significantOffsets)), file=fp)
-
-            print('Reads were assigned to %d connected components:' %
-                  len(components), file=fp)
+            print(
+                "Reads were assigned to %d connected components:" % len(components),
+                file=fp,
+            )
 
             totalReads = 0
             for count, component in enumerate(components, start=1):
-
-                filename = join(outputDir, 'component-%d.txt' % count)
-                self.report('    Writing component %d summary to' % count,
-                            filename)
-                with open(filename, 'w') as fp2:
+                filename = join(outputDir, "component-%d.txt" % count)
+                self.report("    Writing component %d summary to" % count, filename)
+                with open(filename, "w") as fp2:
                     component.summarize(fp2, count)
 
                 componentCount = len(component)
                 offsets = component.offsets
                 totalReads += componentCount
                 print(
-                    '\nConnected component %d: %d reads, covering %d offsets '
-                    '(%d to %d)' % (
-                        count, componentCount, len(offsets),
-                        min(offsets), max(offsets)), file=fp)
+                    "\nConnected component %d: %d reads, covering %d offsets "
+                    "(%d to %d)"
+                    % (count, componentCount, len(offsets), min(offsets), max(offsets)),
+                    file=fp,
+                )
 
                 ccCounts = sorted(
-                    map(len, (cc.reads
-                              for cc in component.consistentComponents)),
-                    reverse=True)
+                    map(len, (cc.reads for cc in component.consistentComponents)),
+                    reverse=True,
+                )
                 if len(ccCounts) > 1:
-                    print('  largest two consistent component size ratio '
-                          '%.2f' % (ccCounts[0] / ccCounts[1]), file=fp)
+                    print(
+                        "  largest two consistent component size ratio "
+                        "%.2f" % (ccCounts[0] / ccCounts[1]),
+                        file=fp,
+                    )
 
-                for j, cc in enumerate(component.consistentComponents,
-                                       start=1):
-                    print('  consistent sub-component %d: read count %d, '
-                          'covered offset count %d.' %
-                          (j, len(cc.reads), len(cc.nucleotides)), file=fp)
+                for j, cc in enumerate(component.consistentComponents, start=1):
+                    print(
+                        "  consistent sub-component %d: read count %d, "
+                        "covered offset count %d."
+                        % (j, len(cc.reads), len(cc.nucleotides)),
+                        file=fp,
+                    )
 
-            print('\nIn total, %d reads were assigned to components.' %
-                  totalReads, file=fp)
+            print(
+                "\nIn total, %d reads were assigned to components." % totalReads,
+                file=fp,
+            )

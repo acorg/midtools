@@ -21,24 +21,24 @@ def sampleIdKey(id_):
         any.
     """
     # This is stolen from pyhbv/samples.py
-    prefix = ''
+    prefix = ""
     value = 0
-    trailing = ''
+    trailing = ""
 
-    state = 'PREFIX'
+    state = "PREFIX"
 
     for offset, c in enumerate(id_):
-        if state == 'PREFIX':
+        if state == "PREFIX":
             if c.isdigit():
-                state = 'VALUE'
+                state = "VALUE"
                 value = 10 * value + int(c)
             else:
                 prefix += c
-        elif state == 'VALUE':
+        elif state == "VALUE":
             if c.isdigit():
                 value = 10 * value + int(c)
             else:
-                state = 'TRAILING'
+                state = "TRAILING"
                 trailing += c
         else:
             trailing += c
@@ -54,7 +54,7 @@ def plotScores(sampleData, outfile):
     maxLength = -1
 
     for sampleName in sorted(sampleData, key=sampleIdKey):
-        values = sampleData[sampleName]['values']
+        values = sampleData[sampleName]["values"]
         length = len(values)
         if length > maxLength:
             maxLength = length
@@ -69,28 +69,28 @@ def plotScores(sampleData, outfile):
                 x=list(range(1 + initialZeroCount, length + 1)),
                 y=values[initialZeroCount:],
                 # mode='lines+markers',
-                mode='markers',
+                mode="markers",
                 name=sampleName,
-                text=sampleData[sampleName]['text'][initialZeroCount:],
+                text=sampleData[sampleName]["text"][initialZeroCount:],
                 marker=dict(
                     size=4,
                     # color=color,
                     line=dict(
                         width=0,
                         # color=color,
-                    )
-                )
+                    ),
+                ),
             )
         )
 
     xmargin = max(1, int(maxLength * 0.01))
     xaxis = {
-        'title': 'Rank',
-        'range': (-xmargin, maxLength + xmargin),
+        "title": "Rank",
+        "range": (-xmargin, maxLength + xmargin),
     }
 
     yaxis = {
-        'title': 'Significant location nucleotide frequency entropy',
+        "title": "Significant location nucleotide frequency entropy",
     }
 
     layout = go.Layout(xaxis=xaxis, yaxis=yaxis)
@@ -98,33 +98,43 @@ def plotScores(sampleData, outfile):
     plotly.offline.plot(fig, filename=outfile, show_link=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description=('Show multiple sorted significant genome location '
-                     'nucleotide frequencies for a set of aligned reads.'))
+        description=(
+            "Show multiple sorted significant genome location "
+            "nucleotide frequencies for a set of aligned reads."
+        ),
+    )
 
     parser.add_argument(
-        'json', nargs='+', metavar='file.json',
-        help=('The JSON files containing the sorted location values. These '
-              'are produced using the --valuesFile option when running '
-              'significant-base-frequencies.py'))
+        "json",
+        nargs="+",
+        metavar="file.json",
+        help=(
+            "The JSON files containing the sorted location values. These "
+            "are produced using the --valuesFile option when running "
+            "significant-base-frequencies.py"
+        ),
+    )
 
     parser.add_argument(
-        '--outfile', default='multiple-significant-base-frequencies.html',
-        help='The filename to store the resulting HTML.')
+        "--outfile",
+        default="multiple-significant-base-frequencies.html",
+        help="The filename to store the resulting HTML.",
+    )
 
     args = parser.parse_args()
 
     data = {}
     for filename in args.json:
-        with open(filename, 'r') as fp:
+        with open(filename, "r") as fp:
             x = load(fp)
-            data[x['sampleName']] = {
-                'values': x['values'],
-                'text': x['text'],
+            data[x["sampleName"]] = {
+                "values": x["values"],
+                "text": x["text"],
             }
 
     plotScores(data, args.outfile)

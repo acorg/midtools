@@ -9,6 +9,7 @@ class OffsetBases(object):
     """
     Maintain the count of nucleotide bases at an offset.
     """
+
     def __init__(self):
         self._counts = Counter()
         self._commonest = None
@@ -27,7 +28,7 @@ class OffsetBases(object):
         return self.baseCountsToStr()
 
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.baseCountsToStr())
+        return "<%s %s>" % (self.__class__.__name__, self.baseCountsToStr())
 
     def incorporateBase(self, base):
         """
@@ -67,8 +68,7 @@ class OffsetBases(object):
         """
         orderedCounts = self._counts.most_common()
         maxCount = orderedCounts[0][1]
-        self._commonest = set(
-            x[0] for x in orderedCounts if x[1] == maxCount)
+        self._commonest = set(x[0] for x in orderedCounts if x[1] == maxCount)
         self._clean = True
 
     def baseCountsToStr(self):

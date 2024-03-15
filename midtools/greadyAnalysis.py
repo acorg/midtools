@@ -40,20 +40,34 @@ class GreadyAnalysis(ReadAnalysis):
         input but with just the signifcant locations.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
     """
+
     DEFAULT_AGREEMENT_THRESHOLD = 0.5
 
-    def __init__(self, alignmentFiles, referenceGenomeFiles, referenceIds=None,
-                 cutoff=0.5, outputDir=None,
-                 minReads=ReadAnalysis.DEFAULT_MIN_READS,
-                 homogeneousCutoff=ReadAnalysis.DEFAULT_HOMOGENEOUS_CUTOFF,
-                 plotSAM=False, saveReducedFASTA=False, verbose=0):
-
+    def __init__(
+        self,
+        alignmentFiles,
+        referenceGenomeFiles,
+        referenceIds=None,
+        cutoff=0.5,
+        outputDir=None,
+        minReads=ReadAnalysis.DEFAULT_MIN_READS,
+        homogeneousCutoff=ReadAnalysis.DEFAULT_HOMOGENEOUS_CUTOFF,
+        plotSAM=False,
+        saveReducedFASTA=False,
+        verbose=0,
+    ):
         ReadAnalysis.__init__(
-            self, alignmentFiles, referenceGenomeFiles,
+            self,
+            alignmentFiles,
+            referenceGenomeFiles,
             referenceIds=referenceIds,
-            outputDir=outputDir, minReads=minReads,
-            homogeneousCutoff=homogeneousCutoff, plotSAM=plotSAM,
-            saveReducedFASTA=saveReducedFASTA, verbose=verbose)
+            outputDir=outputDir,
+            minReads=minReads,
+            homogeneousCutoff=homogeneousCutoff,
+            plotSAM=plotSAM,
+            saveReducedFASTA=saveReducedFASTA,
+            verbose=verbose,
+        )
 
         self.cutoff = cutoff
 
@@ -71,17 +85,24 @@ class GreadyAnalysis(ReadAnalysis):
             C{referenceId}.
         """
         analysis = self.initialReferenceIdAnalysis(
-             referenceId, alignmentFile, outputDir)
+            referenceId, alignmentFile, outputDir
+        )
 
         if analysis:
-            (genomeLength, alignedReads, readCountAtOffset,
-             baseCountAtOffset, readsAtOffset, significantOffsets,
-             samFilter, paddedSAM) = analysis
+            (
+                genomeLength,
+                alignedReads,
+                readCountAtOffset,
+                baseCountAtOffset,
+                readsAtOffset,
+                significantOffsets,
+                samFilter,
+                paddedSAM,
+            ) = analysis
         else:
             return
 
-        insignificantOffsets = set(range(genomeLength)) - set(
-            significantOffsets)
+        insignificantOffsets = set(range(genomeLength)) - set(significantOffsets)
 
         reference = self.referenceGenomes[referenceId]
         referenceSequence = reference.sequence
@@ -93,19 +114,20 @@ class GreadyAnalysis(ReadAnalysis):
             consensus.append(ob)
 
         readQueue = PriorityQueue()
-        self.updatePriorityQueue(readQueue, alignedReads,
-                                 consensus, significantOffsets)
+        self.updatePriorityQueue(readQueue, alignedReads, consensus, significantOffsets)
 
-        consensusFilename = join(outputDir, 'reference-consensus.sam')
-        nonConsensusFilename = join(outputDir, 'reference-non-consensus.sam')
-        self.report('    Writing consensus SAM to', consensusFilename)
-        self.report('    Writing non-consensus SAM to', nonConsensusFilename)
+        consensusFilename = join(outputDir, "reference-consensus.sam")
+        nonConsensusFilename = join(outputDir, "reference-non-consensus.sam")
+        self.report("    Writing consensus SAM to", consensusFilename)
+        self.report("    Writing non-consensus SAM to", nonConsensusFilename)
 
         with samfile(alignmentFile) as sam:
             consensusAlignment = AlignmentFile(
-                consensusFilename, mode='w', template=sam)
+                consensusFilename, mode="w", template=sam
+            )
             nonConsensusAlignment = AlignmentFile(
-                nonConsensusFilename, mode='w', template=sam)
+                nonConsensusFilename, mode="w", template=sam
+            )
 
         # Reads with no significant offsets get written to both output files.
         readsWithNoSignificantOffsetsCount = 0
@@ -120,9 +142,13 @@ class GreadyAnalysis(ReadAnalysis):
                     if base is not None:
                         consensus[offset].incorporateBase(base)
 
-        self.report('    %d read%s did not overlap any significant offsets' %
-                    (readsWithNoSignificantOffsetsCount,
-                     s(readsWithNoSignificantOffsetsCount)))
+        self.report(
+            "    %d read%s did not overlap any significant offsets"
+            % (
+                readsWithNoSignificantOffsetsCount,
+                s(readsWithNoSignificantOffsetsCount),
+            )
+        )
 
         readsMatchingConsensusCount = readsNotMatchingConsensusCount = 0
         cutoff = self.cutoff
@@ -140,8 +166,9 @@ class GreadyAnalysis(ReadAnalysis):
                     for readAtOffset in readsAtOffset[offset]:
                         if readAtOffset in readQueue:
                             affectedReads.add(readAtOffset)
-                self.updatePriorityQueue(readQueue, affectedReads,
-                                         consensus, significantOffsets)
+                self.updatePriorityQueue(
+                    readQueue, affectedReads, consensus, significantOffsets
+                )
             else:
                 readsNotMatchingConsensusCount += 1
                 nonConsensusAlignment.write(read.alignment)
@@ -149,19 +176,23 @@ class GreadyAnalysis(ReadAnalysis):
         consensusAlignment.close()
         nonConsensusAlignment.close()
 
-        self.report('    %d read%s matched the consensus, %d did not.' %
-                    (readsMatchingConsensusCount,
-                     s(readsMatchingConsensusCount),
-                     readsNotMatchingConsensusCount))
+        self.report(
+            "    %d read%s matched the consensus, %d did not."
+            % (
+                readsMatchingConsensusCount,
+                s(readsMatchingConsensusCount),
+                readsNotMatchingConsensusCount,
+            )
+        )
 
         # Remove the reference bases from the consensus.
         for offset, base in enumerate(referenceSequence):
             consensus[offset].unincorporateBase(base)
 
-        consensusInfoFilename = join(outputDir, 'reference-consensus.txt')
-        self.report('    Writing consensus info to', consensusInfoFilename)
+        consensusInfoFilename = join(outputDir, "reference-consensus.txt")
+        self.report("    Writing consensus info to", consensusInfoFilename)
 
-        with open(consensusInfoFilename, 'w') as fp:
+        with open(consensusInfoFilename, "w") as fp:
             consensusSequence = []
             for offset in range(genomeLength):
                 # Take a copy of the commonest set because we may pop from
@@ -170,17 +201,18 @@ class GreadyAnalysis(ReadAnalysis):
                 referenceBase = referenceSequence[offset]
 
                 if len(commonest) > 1:
-                    nucleotides = ' Nucleotides: %s' % (
-                        consensus[offset].baseCountsToStr())
+                    nucleotides = " Nucleotides: %s" % (
+                        consensus[offset].baseCountsToStr()
+                    )
                 else:
-                    nucleotides = ''
+                    nucleotides = ""
 
                 if referenceBase in commonest:
                     consensusBase = referenceBase
                 else:
                     if len(commonest) == 1:
                         # Nothing in the included reads covers this offset.
-                        consensusBase = '-'
+                        consensusBase = "-"
                     elif len(commonest) > 1:
                         # Report a draw (in which the reference base is not
                         # included and so cannot be used to break the draw).
@@ -190,25 +222,30 @@ class GreadyAnalysis(ReadAnalysis):
 
                 consensusSequence.append(consensusBase)
 
-                mismatch = '' if referenceBase == consensusBase else (
-                    ' Mismatch (reference has %s)' % referenceBase)
+                mismatch = (
+                    ""
+                    if referenceBase == consensusBase
+                    else (" Mismatch (reference has %s)" % referenceBase)
+                )
 
-                print('%d: %s%s%s' % (
-                    offset + 1, consensusBase, mismatch, nucleotides), file=fp)
+                print(
+                    "%d: %s%s%s" % (offset + 1, consensusBase, mismatch, nucleotides),
+                    file=fp,
+                )
 
-        consensusRead = Read('gready-consensus-%s' % referenceId,
-                             ''.join(consensusSequence))
-        consensusFilename = join(outputDir, 'reference-consensus.fasta')
-        self.report('    Writing gready consensus info to', consensusFilename)
+        consensusRead = Read(
+            "gready-consensus-%s" % referenceId, "".join(consensusSequence)
+        )
+        consensusFilename = join(outputDir, "reference-consensus.fasta")
+        self.report("    Writing gready consensus info to", consensusFilename)
         Reads([consensusRead]).save(consensusFilename)
 
         return {
-            'consensusRead': consensusRead,
-            'significantOffsets': significantOffsets,
+            "consensusRead": consensusRead,
+            "significantOffsets": significantOffsets,
         }
 
-    def updatePriorityQueue(self, readQueue, reads, consensus,
-                            significantOffsets):
+    def updatePriorityQueue(self, readQueue, reads, consensus, significantOffsets):
         """
         Put all aligned reads that cover significant offsets into the priority
         queue, giving each a score corresponding to how well it matches the
@@ -225,13 +262,13 @@ class GreadyAnalysis(ReadAnalysis):
             if read.significantOffsets:
                 matches = 0
                 for offset, base in read.significantOffsets.items():
-                    matches += (base in consensus[offset].commonest)
+                    matches += base in consensus[offset].commonest
 
                 # Lower priority is better.
-                mismatchFraction = 1.0 - (matches /
-                                          len(read.significantOffsets))
-                significantOffsetsMissing = (
-                    significantOffsetCount - len(read.significantOffsets))
+                mismatchFraction = 1.0 - (matches / len(read.significantOffsets))
+                significantOffsetsMissing = significantOffsetCount - len(
+                    read.significantOffsets
+                )
 
                 priority = (mismatchFraction, significantOffsetsMissing)
 

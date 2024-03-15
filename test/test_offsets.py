@@ -17,8 +17,8 @@ class TestOffsetBases(TestCase):
         The class must have the expected content when initialized.
         """
         ob = OffsetBases()
-        ob.incorporateBase('a')
-        self.assertEqual({'a'}, ob.commonest)
+        ob.incorporateBase("a")
+        self.assertEqual({"a"}, ob.commonest)
 
     def testAddNewInstanceOfCommonest(self):
         """
@@ -26,9 +26,9 @@ class TestOffsetBases(TestCase):
         leave the commonest set unchanged.
         """
         ob = OffsetBases()
-        ob.incorporateBase('a')
-        ob.incorporateBase('a')
-        self.assertEqual({'a'}, ob.commonest)
+        ob.incorporateBase("a")
+        ob.incorporateBase("a")
+        self.assertEqual({"a"}, ob.commonest)
 
     def testDraw(self):
         """
@@ -36,9 +36,9 @@ class TestOffsetBases(TestCase):
         being added to.
         """
         ob = OffsetBases()
-        ob.incorporateBase('a')
-        ob.incorporateBase('g')
-        self.assertEqual({'a', 'g'}, ob.commonest)
+        ob.incorporateBase("a")
+        ob.incorporateBase("g")
+        self.assertEqual({"a", "g"}, ob.commonest)
 
     def testCreateDrawThenResolveIt(self):
         """
@@ -46,11 +46,11 @@ class TestOffsetBases(TestCase):
         must result in the commonest set being as expected.
         """
         ob = OffsetBases()
-        ob.incorporateBase('a')
-        ob.incorporateBase('g')
-        ob.incorporateBase('t')
-        ob.incorporateBase('t')
-        self.assertEqual({'t'}, ob.commonest)
+        ob.incorporateBase("a")
+        ob.incorporateBase("g")
+        ob.incorporateBase("t")
+        ob.incorporateBase("t")
+        self.assertEqual({"t"}, ob.commonest)
 
     def testMerge(self):
         """
@@ -58,19 +58,19 @@ class TestOffsetBases(TestCase):
         as expected.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('g')
-        ob1.incorporateBase('t')
-        ob1.incorporateBase('t')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("g")
+        ob1.incorporateBase("t")
+        ob1.incorporateBase("t")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('g')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('c')
+        ob2.incorporateBase("g")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("c")
 
         ob1.merge(ob2)
 
-        self.assertEqual({'c', 'g', 't'}, ob1.commonest)
+        self.assertEqual({"c", "g", "t"}, ob1.commonest)
 
     def testMultiplicativeDistanceZero(self):
         """
@@ -78,11 +78,11 @@ class TestOffsetBases(TestCase):
         offset completely agree.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
+        ob2.incorporateBase("a")
 
         self.assertEqual(0.0, multiplicativeDistance(ob1, ob2))
 
@@ -92,11 +92,11 @@ class TestOffsetBases(TestCase):
         offset completely disagree.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('t')
-        ob1.incorporateBase('c')
+        ob1.incorporateBase("t")
+        ob1.incorporateBase("c")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
+        ob2.incorporateBase("a")
 
         self.assertEqual(1.0, multiplicativeDistance(ob1, ob2))
 
@@ -106,12 +106,12 @@ class TestOffsetBases(TestCase):
         at an offset are balanced (because (0.5 * 0.5) + (0.5 * 0.5) = 0.25).
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('t')
-        ob1.incorporateBase('a')
+        ob1.incorporateBase("t")
+        ob1.incorporateBase("a")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('t')
-        ob2.incorporateBase('a')
+        ob2.incorporateBase("t")
+        ob2.incorporateBase("a")
 
         self.assertEqual(0.5, multiplicativeDistance(ob1, ob2))
 
@@ -122,16 +122,16 @@ class TestOffsetBases(TestCase):
         4/16 + 1/16 + 1/16 = 6/16 (and 1 - 6/16 = 10/16).
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('c')
-        ob1.incorporateBase('t')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("c")
+        ob1.incorporateBase("t")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('t')
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("t")
 
         self.assertEqual(10 / 16, multiplicativeDistance(ob1, ob2))
 
@@ -141,14 +141,14 @@ class TestOffsetBases(TestCase):
         have AAT because (2/3 * 2/3) + (1/3 * 1/3) = 5/9 (and 1 - 5/9 = 4/9).
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('t')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("t")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('t')
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("t")
 
         self.assertAlmostEqual(4 / 9, multiplicativeDistance(ob1, ob2))
 
@@ -158,11 +158,11 @@ class TestOffsetBases(TestCase):
         discrepancy in the base.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
+        ob2.incorporateBase("a")
 
         self.assertAlmostEqual(0.0, homogeneousDistance(ob1, ob2))
 
@@ -172,12 +172,12 @@ class TestOffsetBases(TestCase):
         are equally divided between two choices.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('g')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("g")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('g')
+        ob2.incorporateBase("g")
 
         self.assertAlmostEqual(0.5, homogeneousDistance(ob1, ob2))
 
@@ -188,15 +188,15 @@ class TestOffsetBases(TestCase):
         """
         ob1 = OffsetBases()
         for _ in range(40):
-            ob1.incorporateBase('a')
+            ob1.incorporateBase("a")
         for _ in range(3):
-            ob1.incorporateBase('g')
+            ob1.incorporateBase("g")
 
         ob2 = OffsetBases()
         for _ in range(50):
-            ob2.incorporateBase('a')
+            ob2.incorporateBase("a")
         for _ in range(7):
-            ob2.incorporateBase('g')
+            ob2.incorporateBase("g")
 
         self.assertAlmostEqual(0.1, homogeneousDistance(ob1, ob2))
 
@@ -206,12 +206,12 @@ class TestOffsetBases(TestCase):
         are equally represented. This is its maximum distance.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('c')
-        ob1.incorporateBase('g')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("c")
+        ob1.incorporateBase("g")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('t')
+        ob2.incorporateBase("t")
 
         self.assertAlmostEqual(0.75, homogeneousDistance(ob1, ob2))
 
@@ -221,10 +221,10 @@ class TestOffsetBases(TestCase):
         highestFrequenciesMultiple method must return None.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
+        ob1.incorporateBase("a")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
+        ob2.incorporateBase("a")
 
         self.assertIs(None, highestFrequenciesMultiple(ob1, ob2))
 
@@ -235,25 +235,25 @@ class TestOffsetBases(TestCase):
         highestFrequenciesMultiple method must return 2.0.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('c')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("c")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('g')
-        ob2.incorporateBase('t')
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("g")
+        ob2.incorporateBase("t")
 
         # The total count has 10 x 'a' and 5 x 'c'.
         self.assertEqual(2.0, highestFrequenciesMultiple(ob1, ob2))
@@ -265,18 +265,18 @@ class TestOffsetBases(TestCase):
         must return 1.0.
         """
         ob1 = OffsetBases()
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('a')
-        ob1.incorporateBase('c')
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("a")
+        ob1.incorporateBase("c")
 
         ob2 = OffsetBases()
-        ob2.incorporateBase('a')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('c')
-        ob2.incorporateBase('g')
-        ob2.incorporateBase('t')
+        ob2.incorporateBase("a")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("c")
+        ob2.incorporateBase("g")
+        ob2.incorporateBase("t")
 
         # The total count has 4 x 'a' and 4 x 'c'.
         self.assertEqual(1.0, highestFrequenciesMultiple(ob1, ob2))
