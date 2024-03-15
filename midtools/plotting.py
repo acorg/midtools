@@ -221,7 +221,7 @@ def _plotBaseFrequenciesEntropy(
         data = [go.Histogram(x=values, histnorm="probability")]
 
         xaxis = {
-            "title": ("Significant site nucleotide frequency entropy " "(bits)"),
+            "title": ("Significant site nucleotide frequency entropy (bits)"),
             "range": (-0.05, MAX_ENTROPY),
             "titlefont": {
                 "size": axisFontSize,
@@ -257,7 +257,7 @@ def _plotBaseFrequenciesEntropy(
 
         yaxis = {
             "range": (-0.05, MAX_ENTROPY),
-            "title": ("Significant site nucleotide frequency entropy " "(bits)"),
+            "title": ("Significant site nucleotide frequency entropy (bits)"),
             "titlefont": {
                 "size": axisFontSize,
             },

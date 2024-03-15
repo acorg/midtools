@@ -91,9 +91,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--idPrefix",
         default="read-",
-        help=(
-            "The prefix for the created read ids. The read number " "will be appended."
-        ),
+        help=("The prefix for the created read ids. The read number will be appended."),
     )
 
     parser.add_argument(
@@ -111,7 +109,7 @@ if __name__ == "__main__":
         "--maxReadLength",
         type=int,
         default=None,
-        help=("The maximum length read to create. Defaults to the genome " "length"),
+        help=("The maximum length read to create. Defaults to the genome length"),
     )
 
     parser.add_argument(

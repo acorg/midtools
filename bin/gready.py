@@ -22,9 +22,7 @@ if __name__ == "__main__":
         "--cutoff",
         type=float,
         default=0.5,
-        help=(
-            "Reads with a score less than this will not be put into the " "consensus."
-        ),
+        help=("Reads with a score less than this will not be put into the consensus."),
     )
 
     args = parser.parse_args()

@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--sampleName",
-        help=("The name of the sample, to appear in the --valuesFile (if " "given)."),
+        help=("The name of the sample, to appear in the --valuesFile (if given)."),
     )
 
     parser.add_argument("--title", help="The plot title.")

@@ -790,7 +790,7 @@ class ReadAnalysis(object):
         """
         filename = join(outputDir, "coverage-and-significant-offsets.html")
         self.report("    Saving coverage and significant offset plot to", filename)
-        title = "Coverage and significant offsets for alignment of %s in " "%s" % (
+        title = "Coverage and significant offsets for alignment of %s in %s" % (
             referenceId,
             alignmentFile,
         )

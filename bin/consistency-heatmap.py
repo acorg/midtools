@@ -25,7 +25,6 @@ def plotConsistency(
     title,
     show,
 ):
-    """ """
     scores = []
     text = []
 

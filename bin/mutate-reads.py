@@ -25,7 +25,7 @@ if __name__ == "__main__":
         "--verbose",
         action="store_true",
         default=False,
-        help=("Print (to stderr) the number of mutations made to each " "sequence."),
+        help=("Print (to stderr) the number of mutations made to each sequence."),
     )
 
     parser.add_argument(

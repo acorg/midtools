@@ -1308,7 +1308,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
 
             depthFile = join(outputDir, "non-reference-consensus-depth.txt")
             self.report(
-                "    Writing non-reference consensus depth " "information to", depthFile
+                "    Writing non-reference consensus depth information to", depthFile
             )
             with open(depthFile, "w") as depthFp:
                 for offset in range(genomeLength):

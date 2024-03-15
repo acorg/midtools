@@ -135,21 +135,19 @@ if __name__ == "__main__":
         "--genomeLength",
         type=int,
         default=100,
-        help=("If any random genomes need to be made, this will be their " "length."),
+        help=("If any random genomes need to be made, this will be their length."),
     )
 
     parser.add_argument(
         "--dryRun",
         action="store_true",
-        default=False,
         help="If specified, simply print the actions that would be taken.",
     )
 
     parser.add_argument(
         "--force",
         action="store_true",
-        default=False,
-        help=("If specified, overwrite the contents of the --outputDir " "directory"),
+        help=("If specified, overwrite the contents of the --outputDir directory"),
     )
 
     parser.add_argument(

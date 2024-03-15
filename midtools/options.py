@@ -54,7 +54,6 @@ def addCommandLineOptions(parser, outfileDefaultName=None):
     parser.add_argument(
         "--show",
         action="store_true",
-        default=False,
         help="If specified, show the figure interactively.",
     )
 
@@ -161,7 +160,7 @@ def addAnalysisCommandLineOptions(parser):
         nargs="*",
         help=(
             "The sequence id whose alignment should be analyzed (may "
-            "be repeated). All ids must be present in --referenceGenome "
+            "be repeated). All ids must be present in the --referenceGenome "
             "file. One of the SAM/BAM files given using --alignmentFile "
             "should have an alignment against the given argument. If "
             "omitted, all references that are aligned to in the given "
@@ -173,7 +172,6 @@ def addAnalysisCommandLineOptions(parser):
 
     parser.add_argument(
         "--saveReducedFASTA",
-        default=False,
         action="store_true",
         help=(
             "If given, write out a FASTA file of the original input but "
@@ -183,7 +181,6 @@ def addAnalysisCommandLineOptions(parser):
 
     parser.add_argument(
         "--plotSAM",
-        default=False,
         action="store_true",
         help=(
             "If given, save plots showing where reads are aligned to on "
@@ -195,5 +192,5 @@ def addAnalysisCommandLineOptions(parser):
         "--verbose",
         type=int,
         default=0,
-        help=("The integer verbosity level (0 = no output, 1 = some output, " "etc)."),
+        help=("The integer verbosity level (0 = no output, 1 = some output, etc)."),
     )

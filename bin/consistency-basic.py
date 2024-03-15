@@ -14,7 +14,6 @@ from midtools.options import addCommandLineOptions, parseCommandLineOptions
 def plotConsistency(
     significantOffsets, baseCountAtOffset, readsAtOffset, outfile, title, jitter, show
 ):
-    """ """
     x = []
     ariScores = []
     amiScores = []
