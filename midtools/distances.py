@@ -7,7 +7,7 @@ def _key(a, b):
     return (a, b) if a <= b else (b, a)
 
 
-class DistanceCache(object):
+class DistanceCache:
     """
     Maintain a set of distances between objects, with lazy evaluation and
     removal from the set.

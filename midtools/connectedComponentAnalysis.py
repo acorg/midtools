@@ -1,5 +1,3 @@
-from __future__ import print_function, division
-
 from os.path import join
 from collections import defaultdict, Counter
 
@@ -58,7 +56,7 @@ def connectedComponentsByOffset(significantReads, threshold):
         yield ComponentByOffsets(component, offsets, threshold)
 
 
-class ConsistentComponent(object):
+class ConsistentComponent:
     """
     Hold information about a set of reads that share significant offsets
     and which (largely) agree on the nucleotides present at those offsets.
@@ -161,7 +159,7 @@ class ConsistentComponent(object):
             print("     ", read, file=fp)
 
 
-class ComponentByOffsets(object):
+class ComponentByOffsets:
     """
     Hold information about a set of reads that share significant offsets
     regardless of the nucleotides present at those offsets. Create a list

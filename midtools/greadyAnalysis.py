@@ -1,5 +1,3 @@
-from __future__ import print_function, division
-
 from os.path import join
 from pysam import AlignmentFile
 

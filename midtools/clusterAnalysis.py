@@ -1,5 +1,3 @@
-from __future__ import print_function, division
-
 from os.path import join
 from collections import defaultdict, Counter
 
@@ -13,13 +11,13 @@ from midtools.data import gatherData, findSignificantOffsets
 from midtools.match import matchToString
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.utils import (
-    commas,
-    fastaIdentityTable,
-    s,
-    commonest,
-    nucleotidesToStr,
-    baseCountsToStr,
     alignmentQuality,
+    baseCountsToStr,
+    commas,
+    commonest,
+    fastaIdentityTable,
+    nucleotidesToStr,
+    s,
 )
 
 
@@ -57,7 +55,7 @@ def connectedComponentsByOffset(significantReads, maxClusterDist, fp, verbose=0)
         yield ComponentByOffsets(component, offsets, maxClusterDist, fp, verbose)
 
 
-class ClusterComponent(object):
+class ClusterComponent:
     """
     Hold information about a set of reads that share significant offsets
     and which (largely) agree on the nucleotides present at those offsets.
@@ -174,7 +172,7 @@ class ClusterComponent(object):
             print("     ", read, file=fp)
 
 
-class ComponentByOffsets(object):
+class ComponentByOffsets:
     """
     Hold information about a set of reads that share significant offsets
     regardless of the nucleotides present at those offsets. Create a list

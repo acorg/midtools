@@ -1,5 +1,3 @@
-from __future__ import division
-
 from collections import defaultdict
 from itertools import count
 
@@ -8,7 +6,7 @@ from midtools.offsets import OffsetBases
 from midtools.utils import nucleotidesToStr, s
 
 
-class ReadCluster(object):
+class ReadCluster:
     """
     Maintain a cluster of reads.
     """
@@ -175,7 +173,7 @@ class ReadCluster(object):
             return 1.0
 
 
-class ReadClusters(object):
+class ReadClusters:
     """
     Maintain clusters of reads.
     """

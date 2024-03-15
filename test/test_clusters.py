@@ -1,5 +1,3 @@
-from __future__ import division
-
 from unittest import TestCase
 
 from midtools.clusters import ReadCluster, ReadClusters

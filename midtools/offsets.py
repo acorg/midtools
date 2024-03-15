@@ -1,11 +1,9 @@
-from __future__ import division
-
 from collections import Counter
 
 from midtools.utils import baseCountsToStr
 
 
-class OffsetBases(object):
+class OffsetBases:
     """
     Maintain the count of nucleotide bases at an offset.
     """

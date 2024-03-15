@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import division, print_function
-
 import plotly
 import plotly.graph_objs as go
 from json import load

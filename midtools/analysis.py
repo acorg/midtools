@@ -1,5 +1,3 @@
-from __future__ import print_function, division
-
 import sys
 from tempfile import mkdtemp
 from os import unlink
@@ -27,7 +25,7 @@ from midtools.utils import baseCountsToStr, fastaIdentityTable, s, commas
 from midtools.match import matchToString
 
 
-class ReadAnalysis(object):
+class ReadAnalysis:
     """
     Perform a read alignment analysis for multiple infection detection.
 
