@@ -21,6 +21,11 @@ def makeParser():
     parser.add_argument(
         "--outputFile", required=True, help="The output (HTML) file for the plot."
     )
+    parser.add_argument(
+        "--hbv",
+        action="store_true",
+        help="Make an HBV-specific plot, categorized by genotype.",
+    )
 
     return parser
 
@@ -31,6 +36,7 @@ def main():
     plotAllReferencesSAM(
         SAMFilter(args.samFile),
         args.outputFile,
+        hbv=args.hbv,
         sampleName=args.sampleName,
         alignmentFile=args.samFile,
         jitter=0.5,
