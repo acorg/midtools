@@ -115,7 +115,9 @@ class ConsistentComponent:
             sequence.append(base)
         return "".join(sequence)
 
-    def saveConsensus(self, count, componentOffsets, referenceSequence, consensusFp, infoFp):
+    def saveConsensus(
+        self, count, componentOffsets, referenceSequence, consensusFp, infoFp
+    ):
         """
         Save a consensus as FASTA.
 
@@ -155,7 +157,8 @@ class ConsistentComponent:
         print("    Nucleotide counts for each offset:", file=fp)
         print(nucleotidesToStr(self.nucleotides, "      "), file=fp)
         print(
-            "    Consensus sequence: %s" % self.consensusSequence(componentOffsets, referenceSequence, fp),
+            "    Consensus sequence: %s"
+            % self.consensusSequence(componentOffsets, referenceSequence, fp),
             file=fp,
         )
         print("    Read%s:" % plural, file=fp)
@@ -329,7 +332,9 @@ class ComponentByOffsets:
             )
             print(reference.toString("fasta"), file=consensusFp, end="")
             for i, cc in enumerate(self.consistentComponents, start=1):
-                cc.saveConsensus(i, self.offsets, referenceSequence, consensusFp, infoFp)
+                cc.saveConsensus(
+                    i, self.offsets, referenceSequence, consensusFp, infoFp
+                )
 
         # Write out an HTML table showing the identity between the various
         # component consensuses.
@@ -455,7 +460,12 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         self.saveComponentFasta(components, outputDir)
 
         self.summarize(
-            referenceId, alignedReads, significantOffsets, components, genomeLength, outputDir
+            referenceId,
+            alignedReads,
+            significantOffsets,
+            components,
+            genomeLength,
+            outputDir,
         )
 
         self.saveReferenceComponents(referenceId, components, outputDir)
@@ -1516,10 +1526,18 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         self.report("    Saving component consensuses")
         reference = self.referenceGenomes[referenceId]
         for count, component in enumerate(components, start=1):
-            component.saveConsensuses(outputDir, count, reference.sequence, self.verbose)
+            component.saveConsensuses(
+                outputDir, count, reference.sequence, self.verbose
+            )
 
     def summarize(
-        self, referenceId, alignedReads, significantOffsets, components, genomeLength, outputDir
+        self,
+        referenceId,
+        alignedReads,
+        significantOffsets,
+        components,
+        genomeLength,
+        outputDir,
     ):
         """
         Write out an analysis summary.

@@ -365,7 +365,7 @@ class TestReadClusters(TestCase):
 
     def testMultiplicativeDistanceTwoOffsetsInCommonOneAgreesOneDoesNot(self):
         """
-        The explanation for the numeric result here can only be seen by 
+        The explanation for the numeric result here can only be seen by
         """
         read1 = AlignedRead("id1", "-----CAGT")
         read1.setSignificantOffsets([5, 6, 7, 8])

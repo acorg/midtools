@@ -128,9 +128,7 @@ class OffsetBases:
         allBases = set(aCounts) | set(bCounts)
 
         # Let a ZeroDivisionError occur if denom is zero.
-        return 1.0 - max(
-            ((aCounts[base] + bCounts[base]) / denom) for base in allBases
-        )
+        return 1.0 - max(((aCounts[base] + bCounts[base]) / denom) for base in allBases)
 
     @staticmethod
     def highestFrequenciesMultiple(a, b):
