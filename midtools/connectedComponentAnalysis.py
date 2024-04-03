@@ -87,7 +87,7 @@ class ConsistentComponent:
         for read in sorted(self.reads):
             print(read.toPaddedString(), end="", file=fp)
 
-    def consensusSequence(self, componentOffsets, infoFp):
+    def consensusSequence(self, componentOffsets, referenceSequence, infoFp):
         """
         Get a consensus sequence.
 
@@ -95,14 +95,17 @@ class ConsistentComponent:
             is *not* the same as the offsets in this consistent component
             because this consistent component may not have reads for all
             offsets.
+        @param referenceSequence: The C{str} reference sequence.
         @param infoFp: A file pointer to write draw (and other) info to.
         @return: A C{str} consensus sequence.
         """
         sequence = []
         for offset in sorted(componentOffsets):
             if offset in self.nucleotides:
+                referenceBase = referenceSequence[offset]
                 base = commonest(
                     self.nucleotides[offset],
+                    referenceBase,
                     infoFp,
                     "WARNING: consensus draw at offset %d" % offset
                     + " %(baseCounts)s.",
@@ -112,7 +115,7 @@ class ConsistentComponent:
             sequence.append(base)
         return "".join(sequence)
 
-    def saveConsensus(self, count, componentOffsets, consensusFp, infoFp):
+    def saveConsensus(self, count, componentOffsets, referenceSequence, consensusFp, infoFp):
         """
         Save a consensus as FASTA.
 
@@ -122,6 +125,7 @@ class ConsistentComponent:
             is *not* the same as the offsets in this consistent component
             because this consistent component may not have reads for all
             offsets.
+        @param referenceSequence: The C{str} reference sequence.
         @param consensusFp: A file pointer to write the consensus to.
         @param drawFp: A file pointer to write draw (and other) info to.
         """
@@ -129,13 +133,13 @@ class ConsistentComponent:
             Read(
                 "consistent-component-%d-consensus (based on %d reads)"
                 % (count, len(self.reads)),
-                self.consensusSequence(componentOffsets, infoFp),
+                self.consensusSequence(componentOffsets, referenceSequence, infoFp),
             ).toString("fasta"),
             file=consensusFp,
             end="",
         )
 
-    def summarize(self, fp, count, componentOffsets):
+    def summarize(self, fp, count, componentOffsets, referenceSequence):
         plural = s(len(self.reads))
         print(
             "    Consistent component %d: %d read%s, covering %d offset%s"
@@ -151,7 +155,7 @@ class ConsistentComponent:
         print("    Nucleotide counts for each offset:", file=fp)
         print(nucleotidesToStr(self.nucleotides, "      "), file=fp)
         print(
-            "    Consensus sequence: %s" % self.consensusSequence(componentOffsets, fp),
+            "    Consensus sequence: %s" % self.consensusSequence(componentOffsets, referenceSequence, fp),
             file=fp,
         )
         print("    Read%s:" % plural, file=fp)
@@ -182,7 +186,7 @@ class ComponentByOffsets:
         ccReads = sum(map(len, self.consistentComponents))
         assert selfReads == ccReads, "%d != %d" % (selfReads, ccReads)
 
-    def summarize(self, fp, count):
+    def summarize(self, fp, count, referenceSequence):
         ccLengths = ", ".join(
             str(length) for length in map(len, self.consistentComponents)
         )
@@ -204,7 +208,7 @@ class ComponentByOffsets:
 
         for i, cc in enumerate(self.consistentComponents, start=1):
             print(file=fp)
-            cc.summarize(fp, i, self.offsets)
+            cc.summarize(fp, i, self.offsets, referenceSequence)
 
     def saveFasta(self, outputDir, count, verbose):
         for i, cc in enumerate(self.consistentComponents, start=1):
@@ -307,7 +311,7 @@ class ComponentByOffsets:
             componentReads.difference_update(ccReads)
             yield ConsistentComponent(ccReads, nucleotides)
 
-    def saveConsensuses(self, outputDir, count, verbose):
+    def saveConsensuses(self, outputDir, count, referenceSequence, verbose):
         consensusFilename = join(outputDir, "component-%d-consensuses.fasta" % count)
         infoFilename = join(outputDir, "component-%d-consensuses.txt" % count)
         if verbose:
@@ -325,7 +329,7 @@ class ComponentByOffsets:
             )
             print(reference.toString("fasta"), file=consensusFp, end="")
             for i, cc in enumerate(self.consistentComponents, start=1):
-                cc.saveConsensus(i, self.offsets, consensusFp, infoFp)
+                cc.saveConsensus(i, self.offsets, referenceSequence, consensusFp, infoFp)
 
         # Write out an HTML table showing the identity between the various
         # component consensuses.
@@ -388,8 +392,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         plotSAM=False,
         verbose=0,
     ):
-        ReadAnalysis.__init__(
-            self,
+        super().__init__(
             alignmentFiles,
             referenceGenomeFiles,
             referenceIds=referenceIds,
@@ -452,12 +455,12 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         self.saveComponentFasta(components, outputDir)
 
         self.summarize(
-            alignedReads, significantOffsets, components, genomeLength, outputDir
+            referenceId, alignedReads, significantOffsets, components, genomeLength, outputDir
         )
 
         self.saveReferenceComponents(referenceId, components, outputDir)
 
-        self.saveComponentConsensuses(components, outputDir)
+        self.saveComponentConsensuses(referenceId, components, outputDir)
 
         (
             consensusRead,
@@ -1502,23 +1505,26 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             show=False,
         )
 
-    def saveComponentConsensuses(self, components, outputDir):
+    def saveComponentConsensuses(self, referenceId, components, outputDir):
         """
         Write out a component consensus sequence.
 
+        @param referenceId: The C{str} id of the reference sequence.
         @param components: A C{list} of C{ComponentByOffsets} instances.
         @param outputDir: A C{str} directory path.
         """
         self.report("    Saving component consensuses")
+        reference = self.referenceGenomes[referenceId]
         for count, component in enumerate(components, start=1):
-            component.saveConsensuses(outputDir, count, self.verbose)
+            component.saveConsensuses(outputDir, count, reference.sequence, self.verbose)
 
     def summarize(
-        self, alignedReads, significantOffsets, components, genomeLength, outputDir
+        self, referenceId, alignedReads, significantOffsets, components, genomeLength, outputDir
     ):
         """
         Write out an analysis summary.
 
+        @param referenceId: The C{str} id of the reference sequence.
         @param alignedReads: A C{list} of C{AlignedRead} instances.
         @param significantOffsets: A C{set} of signifcant offsets.
         @param components: A C{list} of C{ComponentByOffsets} instances.
@@ -1528,6 +1534,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         """
         filename = join(outputDir, "component-summary.txt")
         self.report("    Writing analysis summary to", filename)
+        reference = self.referenceGenomes[referenceId]
 
         with open(filename, "w") as fp:
             print(
@@ -1547,7 +1554,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                 filename = join(outputDir, "component-%d.txt" % count)
                 self.report("    Writing component %d summary to" % count, filename)
                 with open(filename, "w") as fp2:
-                    component.summarize(fp2, count)
+                    component.summarize(fp2, count, reference.sequence)
 
                 componentCount = len(component)
                 offsets = component.offsets

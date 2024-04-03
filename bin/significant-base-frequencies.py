@@ -39,7 +39,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--histogram",
         action="store_true",
-        default=False,
         help=(
             "If specified and --sortOn is used, the values (according to "
             "--sortOn) will be shown in a histogram."

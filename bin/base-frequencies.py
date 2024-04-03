@@ -21,7 +21,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--verbose",
         action="store_true",
-        default=False,
         help="Print verbose textual output showing read connections.",
     )
 

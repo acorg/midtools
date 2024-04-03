@@ -41,9 +41,9 @@ class DistanceCache:
 
         if self._distances:
             for b in list(self._distances):
-                d = self._distFunc(a, b)
-                self._distances[b][a] = self._distances[a][b] = d
-                self._pq.add(_key(a, b), d)
+                distance = self._distFunc(a, b)
+                self._distances[b][a] = self._distances[a][b] = distance
+                self._pq.add(_key(a, b), distance)
         else:
             # This is the first element, so it has no distances to
             # anything.  Mention it to create its distance dictionary so it
@@ -75,12 +75,15 @@ class DistanceCache:
         Test if a pair has a computed distance (useful for testing).
 
         @param pair: A 2-tuple of objects.
-        @return: A Boolean indicating membership.
+        @return: A C{bool} indicating membership.
         """
-        return (pair[0], pair[1]) in self._distances or (
-            pair[1],
-            pair[0],
-        ) in self._distances
+        a, b = pair
+        try:
+            self._distances[a][b]
+        except KeyError:
+            return False
+        else:
+            return True
 
     def remove(self, a):
         """
@@ -95,7 +98,7 @@ class DistanceCache:
                     self._pq.remove(_key(a, b))
                 except KeyError:
                     # We allow one KeyError since 'a' has likely just been
-                    # popped as part of the lowest scoring pain.
+                    # popped as part of the lowest scoring pair.
                     errorCount += 1
                     if errorCount > 1:
                         raise

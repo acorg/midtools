@@ -89,54 +89,52 @@ if __name__ == "__main__":
     parser.add_argument(
         "--idPrefix",
         default="read-",
-        help=("The prefix for the created read ids. The read number will be appended."),
+        help="The prefix for the created read ids. The read number will be appended.",
     )
 
     parser.add_argument(
-        "--count", type=int, default=100, help="The number of reads to create"
+        "--count", type=int, default=100, help="The number of reads to create."
     )
 
     parser.add_argument(
         "--minReadLength",
         type=int,
         default=10,
-        help="The minimum length read to create",
+        help="The minimum length read to create.",
     )
 
     parser.add_argument(
         "--maxReadLength",
         type=int,
         default=None,
-        help=("The maximum length read to create. Defaults to the genome length"),
+        help="The maximum length read to create. Defaults to the genome length.",
     )
 
     parser.add_argument(
-        "--rate", type=float, default=0.0, help="The per-base mutation rate to use"
+        "--rate", type=float, default=0.0, help="The per-base mutation rate to use."
     )
 
     parser.add_argument(
-        "--meanLength", type=float, default=100.0, help="The mean read length"
+        "--meanLength", type=float, default=100.0, help="The mean read length."
     )
 
     parser.add_argument(
         "--sdLength",
         type=float,
         default=10.0,
-        help="The standard deviation of read length",
+        help="The standard deviation of read length.",
     )
 
     parser.add_argument(
         "--verbose",
         action="store_true",
-        default=False,
         help="Print (to stderr) information about the created reads.",
     )
 
     parser.add_argument(
         "--fastaReads",
         action="store_true",
-        default=False,
-        help="Make the reads be FASTA instead of FASTQ",
+        help="Make the reads be FASTA instead of FASTQ.",
     )
 
     parser.add_argument(
@@ -144,14 +142,13 @@ if __name__ == "__main__":
         default="I",
         help=(
             "The quality character to use for all quality scores when "
-            "--fastq is used"
+            "--fastq is used."
         ),
     )
 
     parser.add_argument(
         "--circularGenome",
         action="store_true",
-        default=False,
         help=(
             "If specified, reads will wrap around the genome (currently not "
             "compatible with --alignReads)."
@@ -161,14 +158,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--printGenome",
         action="store_true",
-        default=False,
         help="If specified, print the genome as the first sequence.",
     )
 
     parser.add_argument(
         "--alignReads",
         action="store_true",
-        default=False,
         help=(
             'If specified, print the reads aligned (with "-" characters) '
             "to the genome."
@@ -178,8 +173,8 @@ if __name__ == "__main__":
     addFASTACommandLineOptions(parser)
     args = parser.parse_args()
     reads = list(parseFASTACommandLineOptions(args))
-    # There should only be one "read", the sequence we are to create other
-    # reads from.
+    # There should only be one "read", being the sequence we will create
+    # other reads from.
     assert (
         len(reads) == 1
     ), "FASTA input contained %d sequence%s (expected just one)." % (
@@ -197,40 +192,40 @@ if __name__ == "__main__":
         )
 
     if meanLength <= 0:
-        raise ValueError("The mean read length must be greater than zero")
+        raise ValueError("The mean read length must be greater than zero.")
 
     sdLength = args.sdLength
 
     if sdLength <= 0.0:
-        raise ValueError("The read length standard deviation must be > 0.0")
+        raise ValueError("The read length standard deviation must be > 0.0.")
 
     rate = args.rate
 
     if not (0.0 <= rate <= 1.0):
-        raise ValueError("The read mutation rate must be in [0.0, 1.0]")
+        raise ValueError("The read mutation rate must be in [0.0, 1.0].")
 
     minReadLength = args.minReadLength
 
     if minReadLength <= 0:
-        raise ValueError("The minimum read length must be positive")
+        raise ValueError("The minimum read length must be positive.")
 
     maxReadLength = args.maxReadLength
 
     if maxReadLength is None:
         maxReadLength = genomeLen
     elif maxReadLength <= 0:
-        raise ValueError("The maximum read length must be positive")
+        raise ValueError("The maximum read length must be positive.")
 
     if minReadLength > maxReadLength:
         raise ValueError(
-            "The minimum read length cannot exceed the maximum read length"
+            "The minimum read length cannot exceed the maximum read length."
         )
 
     alignReads = args.alignReads
     circularGenome = args.circularGenome
 
     if circularGenome and alignReads:
-        raise ValueError("You cannot specify both --circularGenome and --alignReads")
+        raise ValueError("You cannot specify both --circularGenome and --alignReads.")
 
     idPrefix = args.idPrefix
     verbose = args.verbose

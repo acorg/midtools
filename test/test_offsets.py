@@ -72,7 +72,13 @@ class TestOffsetBases(TestCase):
 
         self.assertEqual({"c", "g", "t"}, ob1.commonest)
 
-    def testMultiplicativeDistanceZero(self):
+
+class TestMultiplicativeDistance(TestCase):
+    """
+    Test the multiplicativeDistance function.
+    """
+
+    def testZero(self):
         """
         The multiplicativeDistance method must return zero when the bases at an
         offset completely agree.
@@ -86,7 +92,7 @@ class TestOffsetBases(TestCase):
 
         self.assertEqual(0.0, multiplicativeDistance(ob1, ob2))
 
-    def testMultiplicativeDistanceOne(self):
+    def testOne(self):
         """
         The multiplicativeDistance method must return one when the bases at an
         offset completely disagree.
@@ -100,7 +106,7 @@ class TestOffsetBases(TestCase):
 
         self.assertEqual(1.0, multiplicativeDistance(ob1, ob2))
 
-    def testMultiplicativeDistanceOneHalf(self):
+    def testOneHalf(self):
         """
         The multiplicativeDistance method must return 0.5 when the two bases
         at an offset are balanced (because (0.5 * 0.5) + (0.5 * 0.5) = 0.25).
@@ -115,7 +121,7 @@ class TestOffsetBases(TestCase):
 
         self.assertEqual(0.5, multiplicativeDistance(ob1, ob2))
 
-    def testMultiplicativeDistanceSixSixteenths(self):
+    def testSixSixteenths(self):
         """
         The multiplicativeDistance method must return 10/16 when both
         have AATC because (0.5 * 0.5) + (0.25 * 0.25) + (0.25 * 0.25) =
@@ -135,7 +141,7 @@ class TestOffsetBases(TestCase):
 
         self.assertEqual(10 / 16, multiplicativeDistance(ob1, ob2))
 
-    def testMultiplicativeDistanceFiveNinths(self):
+    def testFourNinths(self):
         """
         The multiplicativeDistance method must return 4/9 when both
         have AAT because (2/3 * 2/3) + (1/3 * 1/3) = 5/9 (and 1 - 5/9 = 4/9).
@@ -152,7 +158,13 @@ class TestOffsetBases(TestCase):
 
         self.assertAlmostEqual(4 / 9, multiplicativeDistance(ob1, ob2))
 
-    def testHomogeneousDistanceZero(self):
+
+class TestHomogeneousDistance(TestCase):
+    """
+    Test the homogeneousDistance function.
+    """
+
+    def testZero(self):
         """
         The homogeneousDistance method must return zero when both there is no
         discrepancy in the base.
@@ -166,7 +178,7 @@ class TestOffsetBases(TestCase):
 
         self.assertAlmostEqual(0.0, homogeneousDistance(ob1, ob2))
 
-    def testHomogeneousDistanceOneHalf(self):
+    def testOneHalf(self):
         """
         The homogeneousDistance method must return 0.5 when the nucleotides
         are equally divided between two choices.
@@ -181,7 +193,7 @@ class TestOffsetBases(TestCase):
 
         self.assertAlmostEqual(0.5, homogeneousDistance(ob1, ob2))
 
-    def testHomogeneousDistancePointOne(self):
+    def testPointOne(self):
         """
         The homogeneousDistance method must return 0.1 when the maximum
         nucleotide fraction is 0.9.
@@ -200,7 +212,7 @@ class TestOffsetBases(TestCase):
 
         self.assertAlmostEqual(0.1, homogeneousDistance(ob1, ob2))
 
-    def testHomogeneousDistanceThreeQuarters(self):
+    def testThreeQuarters(self):
         """
         The homogeneousDistance method must return 0.75 when all nucleotides
         are equally represented. This is its maximum distance.
@@ -215,7 +227,13 @@ class TestOffsetBases(TestCase):
 
         self.assertAlmostEqual(0.75, homogeneousDistance(ob1, ob2))
 
-    def testHighestFrequenciesMultipleOneNucleotide(self):
+
+class TestHighestFrequenciesMultiple(TestCase):
+    """
+    Test the highestFrequenciesMultiple function.
+    """
+
+    def testOneNucleotide(self):
         """
         When two offsets both have just a single identical nucleotide, the
         highestFrequenciesMultiple method must return None.
@@ -228,7 +246,7 @@ class TestOffsetBases(TestCase):
 
         self.assertIs(None, highestFrequenciesMultiple(ob1, ob2))
 
-    def testHighestFrequenciesMultipleTwo(self):
+    def testTwo(self):
         """
         When the frequency of the most common nucleotide in the sum of two
         OffsetBases instance is twice the second most common, the
@@ -258,7 +276,7 @@ class TestOffsetBases(TestCase):
         # The total count has 10 x 'a' and 5 x 'c'.
         self.assertEqual(2.0, highestFrequenciesMultiple(ob1, ob2))
 
-    def testHighestFrequenciesMultipleDraw(self):
+    def testDraw(self):
         """
         When the frequency of the two most common nucleotides in the sum of two
         OffsetBases instance is the same, the highestFrequenciesMultiple method

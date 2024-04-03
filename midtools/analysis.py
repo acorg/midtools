@@ -1,10 +1,8 @@
 import sys
 from tempfile import mkdtemp
 from os import unlink
-from os.path import exists, join, basename
-from os import mkdir
 from math import log10
-from pathlib import Path  # This is Python 3 only.
+from pathlib import Path
 from itertools import chain
 from collections import defaultdict
 
@@ -15,30 +13,33 @@ from dark.reads import Reads
 from dark.sam import SAMFilter, PaddedSAM, samfile
 
 from midtools.data import gatherData, findSignificantOffsets
+from midtools.match import matchToString
 from midtools.plotting import (
     plotBaseFrequencies,
     plotCoverageAndSignificantLocations,
     plotSAM,
 )
 from midtools.read import AlignedRead
-from midtools.utils import baseCountsToStr, fastaIdentityTable, s, commas
-from midtools.match import matchToString
+from midtools.utils import baseCountsToStr, fastaIdentityTable, s, commas, quoted
 
 
 class ReadAnalysis:
     """
     Perform a read alignment analysis for multiple infection detection.
 
+    @param sampleName: The C{str} name of the sample whose reads are being
+        analysed.
     @param alignmentFiles: A C{list} of C{str} names of SAM/BAM alignment
-        files.
+        files. These files should have mappings of reads to all references
+        (as produced using the --all option when running bowtie2).
     @param referenceGenomeFiles: A C{list} of C{str} names of FASTA files
         containing reference genomes.
+    @param outputDir: The C{str} directory to save result files to.
     @param referenceIds: The C{str} sequence ids whose alignment should be
         analyzed. All ids must be present in the C{referenceGenomes} files.
         One of the SAM/BAM files given using C{alignmentFiles} should have an
         alignment against the given argument. If omitted, all references that
         are aligned to in the given BAM/SAM files will be analyzed.
-    @param outputDir: The C{str} directory to save result files to.
     @param minReads: The C{int} minimum number of reads that must cover a
         location for it to be considered significant.
     @param homogeneousCutoff: If the most common nucleotide at a location
@@ -51,6 +52,10 @@ class ReadAnalysis:
         adding reads to a component.
     @param plotSAM: If C{True} save plots of where reads lie on each reference
         genome (can be slow).
+    @param plotAllReferencesSAM: If C{True}, save a plot showing where reads are
+        aligned to on the genome along with their alignment scores. This will
+        show all reads as they are aligned to (possibly unequal-length)
+        references (can be slow).
     @param saveReducedFASTA: If C{True}, write out a FASTA file of the original
         input but with just the signifcant locations.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
@@ -61,21 +66,25 @@ class ReadAnalysis:
 
     def __init__(
         self,
+        sampleName,
         alignmentFiles,
         referenceGenomeFiles,
+        outputDir,
         referenceIds=None,
-        outputDir=None,
         minReads=DEFAULT_MIN_READS,
         homogeneousCutoff=DEFAULT_HOMOGENEOUS_CUTOFF,
         plotSAM=False,
+        plotAllReferencesSAM=False,
         saveReducedFASTA=False,
         verbose=0,
     ):
-        self.alignmentFiles = alignmentFiles
-        self.outputDir = outputDir
+        self.sampleName = sampleName
+        self.alignmentFiles = [Path(f) for f in alignmentFiles]
+        self.outputDir = Path(outputDir)
         self.minReads = minReads
         self.homogeneousCutoff = homogeneousCutoff
         self.plotSAM = plotSAM
+        self.plotAllReferencesSAM = plotAllReferencesSAM
         self.saveReducedFASTA = saveReducedFASTA
         self.verbose = verbose
         self.referenceGenomes = self._readReferenceGenomes(referenceGenomeFiles)
@@ -87,11 +96,11 @@ class ReadAnalysis:
 
         # Make short output file names from the given reference file names.
         self.shortAlignmentFilename = dict(
-            (filename, basename(filename).rsplit(".", maxsplit=1)[0])
-            for filename in alignmentFiles
+            (filename, filename.name.rsplit(".", maxsplit=1)[0])
+            for filename in self.alignmentFiles
         )
 
-        alignedReferences = self._getAlignedReferences(alignmentFiles)
+        alignedReferences = self._getAlignedReferences(self.alignmentFiles)
         self.referenceIds = self._getReferenceIds(alignedReferences, referenceIds)
 
     def _getReferenceIds(self, alignedReferences, referenceIds):
@@ -134,7 +143,7 @@ class ReadAnalysis:
             # the alignments of, so examine all available references
             # mentioned in any alignment file and that we also have a
             # genome for. Mention any references from alignment files that
-            # we can't process due to lack of genome.
+            # we can't process due to lack of a genome.
             missing = alignedReferences - set(self.referenceGenomes)
             if missing:
                 self.report(
@@ -181,7 +190,7 @@ class ReadAnalysis:
         results = defaultdict(lambda: defaultdict(dict))
 
         for alignmentFile in self.alignmentFiles:
-            self.report("Analyzing alignment file", alignmentFile)
+            self.report(f"Analyzing alignment file {quoted(alignmentFile)}")
             alignmentOutputDir = self._setupAlignmentOutputDir(alignmentFile, outputDir)
 
             self._writeAlignmentFileSummary(alignmentFile, alignmentOutputDir)
@@ -202,8 +211,8 @@ class ReadAnalysis:
 
             self._writeAlignmentHTMLSummary(results[alignmentFile], alignmentOutputDir)
 
-        self._writeOverallResultSummary(results, self.outputDir)
-        self._writeOverallResultSummarySummary(results, self.outputDir)
+        self._writeOverallResultSummary(results, outputDir)
+        self._writeOverallResultSummarySummary(results, outputDir)
 
         return results
 
@@ -214,7 +223,7 @@ class ReadAnalysis:
 
         @param referenceId: The C{str} id of the reference sequence to analyze.
         @param alignmentFile: The C{str} name of an alignment file.
-        @param outputDir: The C{str} name of the output directory.
+        @param outputDir: The C{Path} to the output directory.
         @return: C{None} if C{referenceId} is not present in C{alignmentFile}
             or if no significant offsets are found. Else, a C{dict} with C{str}
             keys 'significantOffsets' (containing the signifcant offsets) and
@@ -228,13 +237,16 @@ class ReadAnalysis:
         Write a summary of alignments.
 
         @param alignmentFile: The C{str} name of an alignment file.
-        @param outputDir: The C{str} name of the output directory.
+        @param outputDir: The C{Path} to the output directory.
         """
         shortAlignmentFilename = self.shortAlignmentFilename[alignmentFile]
-        filename = join(outputDir, shortAlignmentFilename + ".stats")
+        filename = outputDir / (shortAlignmentFilename + ".stats")
         self.report("  Writing alignment statistics to", filename)
         e = Executor()
-        e.execute('sam-reference-read-counts.py "%s" > %s' % (alignmentFile, filename))
+        e.execute(
+            f"sam-reference-read-counts.py {quoted(alignmentFile)} > "
+            f"{quoted(filename)}"
+        )
         if self.verbose > 1:
             for line in e.log:
                 print("    ", line)
@@ -248,7 +260,7 @@ class ReadAnalysis:
            consensus sequence for the corresponding reference in the alignment
            file.
         """
-        referencesFilename = join(outputDir, "references.fasta")
+        referencesFilename = outputDir / "references.fasta"
         self.report("  Writing FASTA for mapped-to references to", referencesFilename)
         with open(referencesFilename, "w") as fp:
             for referenceId in sorted(result):
@@ -258,7 +270,7 @@ class ReadAnalysis:
                     end="",
                 )
 
-        consensusesFilename = join(outputDir, "consensuses.fasta")
+        consensusesFilename = outputDir / "consensuses.fasta"
         self.report(
             "  Writing FASTA consensus for mapped-to references to", consensusesFilename
         )
@@ -270,7 +282,7 @@ class ReadAnalysis:
                     end="",
                 )
 
-        htmlFilename = join(outputDir, "consensus-vs-reference.html")
+        htmlFilename = outputDir / "consensus-vs-reference.html"
         self.report("  Writing consensus vs reference identity table to", htmlFilename)
         fastaIdentityTable(
             consensusesFilename,
@@ -279,7 +291,7 @@ class ReadAnalysis:
             filename2=referencesFilename,
         )
 
-        htmlFilename = join(outputDir, "consensus-vs-consensus.html")
+        htmlFilename = outputDir / "consensus-vs-consensus.html"
         self.report("  Writing consensus vs consensus identity table to", htmlFilename)
         fastaIdentityTable(consensusesFilename, htmlFilename, self.verbose)
 
@@ -292,11 +304,11 @@ class ReadAnalysis:
            C{dict}s with signifcant offsets and best consensus sequence for
            the corresponding reference in the alignment file.
         """
-        filename = join(outputDir, "result-summary.txt")
+        filename = outputDir / "result-summary.txt"
         self.report("Writing overall result summary to", filename)
         with open(filename, "w") as fp:
             for alignmentFilename in sorted(results):
-                print("Alignment file", alignmentFilename, file=fp)
+                print(f"Alignment file {quoted(alignmentFilename)}", file=fp)
                 for referenceId in sorted(results[alignmentFilename]):
                     result = results[alignmentFilename][referenceId]
                     referenceRead = self.referenceGenomes[referenceId]
@@ -374,7 +386,7 @@ class ReadAnalysis:
            C{dict}s with signifcant offsets and best consensus sequence for
            the corresponding reference in the alignment file.
         """
-        filename = join(outputDir, "result-summary-summary.txt")
+        filename = outputDir / "result-summary-summary.txt"
         self.report("Writing overall result summary summary to", filename)
 
         bestFraction = 0.0
@@ -382,7 +394,7 @@ class ReadAnalysis:
 
         with open(filename, "w") as fp:
             for alignmentFilename in sorted(results):
-                print(alignmentFilename, file=fp)
+                print(f"{str(alignmentFilename)}", file=fp)
                 resultSummary = []
                 for referenceId in sorted(results[alignmentFilename]):
                     result = results[alignmentFilename][referenceId]
@@ -430,7 +442,7 @@ class ReadAnalysis:
                 file=fp,
             )
             for alignmentFilename, referenceId in bestAlignmentReference:
-                print("  %s: %s" % (alignmentFilename, referenceId), file=fp)
+                print(f"  {str(alignmentFilename)}: {referenceId}", file=fp)
 
     def initialReferenceIdAnalysis(self, referenceId, alignmentFile, outputDir):
         """
@@ -439,7 +451,7 @@ class ReadAnalysis:
 
         @param referenceId: The C{str} id of the reference sequence to analyze.
         @param alignmentFile: The C{str} name of an alignment file.
-        @param outputDir: The C{str} name of the output directory.
+        @param outputDir: The C{Path} to the output directory.
         @return: C{None} if C{referenceId} is not present in C{alignmentFile}
             or if no significant offsets are found. Else, a C{dict} containing
             the signifcant offsets and the consensus sequence that best matches
@@ -461,7 +473,7 @@ class ReadAnalysis:
                 assert genomeLength == len(self.referenceGenomes[referenceId])
 
         if self.plotSAM:
-            filename = join(outputDir, "reads.html")
+            filename = outputDir / "reads.html"
             self.report("    Saving reads alignment plot to %s" % filename)
             plotSAM(
                 SAMFilter(alignmentFile, referenceIds={referenceId}),
@@ -509,7 +521,7 @@ class ReadAnalysis:
                 s(samFilter.alignmentCount),
                 len(samFilter.queryIds),
                 "query" if len(samFilter.queryIds) == 1 else "queries",
-                alignmentFile,
+                str(alignmentFile),
             )
         )
         self.report(
@@ -559,7 +571,7 @@ class ReadAnalysis:
         )
 
         # Save the reference.
-        filename = join(outputDir, "reference.fasta")
+        filename = outputDir / "reference.fasta"
         self.report("    Saving reference to", filename)
         reference = self.referenceGenomes[referenceId]
         Reads([reference]).save(filename)
@@ -585,30 +597,38 @@ class ReadAnalysis:
         @return: The C{str} path of the output directory.
         """
         if self.outputDir:
-            if exists(self.outputDir):
+            if self.outputDir.exists():
                 self._removePreExistingTopLevelOutputDirFiles()
             else:
-                mkdir(self.outputDir)
+                self.outputDir.mkdir()
         else:
             self.outputDir = mkdtemp()
             print("Writing output files to %s" % self.outputDir)
         return self.outputDir
+
+    def _alignmentOutputDir(self, alignmentFile, outputDir):
+        """
+        Get output directory for a given alignment file.
+
+        @param alignmentFile: The C{str} name of an alignment file.
+        @param outputDir: The C{Path} to the top-level output directory.
+        @return: The C{str} output directory name.
+        """
+        return outputDir / self.shortAlignmentFilename[alignmentFile]
 
     def _setupAlignmentOutputDir(self, alignmentFile, outputDir):
         """
         Set up the output directory for a given alignment file.
 
         @param alignmentFile: The C{str} name of an alignment file.
-        @param outputDir: The C{str} name of the top-level output directory.
+        @param outputDir: The C{Path} to the top-level output directory.
         @return: The C{str} output directory name.
         """
-        shortAlignmentFilename = self.shortAlignmentFilename[alignmentFile]
-
-        directory = join(outputDir, shortAlignmentFilename)
-        if exists(directory):
+        directory = self._alignmentOutputDir(alignmentFile, outputDir)
+        if directory.exists():
             self._removePreExistingAlignmentDirFiles(directory)
         else:
-            mkdir(directory)
+            directory.mkdir()
 
         return directory
 
@@ -617,18 +637,18 @@ class ReadAnalysis:
         Set up the output directory for a given alignment file and reference.
 
         @param referenceId: The C{str} id of the reference sequence.
-        @param outputDir: The C{str} name of the top-level output directory.
+        @param outputDir: The C{Path} to the top-level output directory.
         @return: The C{str} output directory name.
         """
         # Make short versions of the reference id and filename for a
         # per-alignment-file per-reference-sequence output directory.
 
         shortReferenceId = self.shortReferenceId[referenceId]
-        directory = join(outputDir, shortReferenceId)
-        if exists(directory):
+        directory = outputDir / shortReferenceId
+        if directory.exists():
             self._removePreExistingReferenceDirFiles(directory)
         else:
-            mkdir(directory)
+            directory.mkdir()
 
         return directory
 
@@ -636,7 +656,7 @@ class ReadAnalysis:
         """
         Get the ids of all reference sequences in all alignment files.
 
-        @param alignmentFiles: A C{list} of C{str} alignment file names.
+        @param alignmentFiles: A C{list} of C{Path} alignment file names.
         @return: A C{set} of C{str} reference ids as found in all passed
             alignment files.
         """
@@ -654,8 +674,8 @@ class ReadAnalysis:
         Read reference genomes from files and check that any duplicates have
         identical sequences.
 
-        @param referenceGenomeFiles: A C{list} of C{str} names of FASTA files
-            containing reference genomes.
+        @param referenceGenomeFiles: A C{list} of C{Path} instances of FASTA
+            files containing reference genomes.
         @raise ValueError: If a reference genome is found in more than one file
             and the sequences are not identical.
         @return: A C{dict} keyed by C{str} sequence id with C{dark.Read}
@@ -665,24 +685,25 @@ class ReadAnalysis:
         seen = {}
         for filename in referenceGenomeFiles:
             for read in FastaReads(filename):
-                id_ = read.id
-                if id_ in seen:
-                    if result[id_].sequence != read.sequence:
+                shortId = read.id.split()[0]
+                if shortId in seen:
+                    if result[shortId].sequence != read.sequence:
                         raise ValueError(
                             "Reference genome id %r was found in two files "
                             "(%r and %r) but with different sequences."
-                            % (id_, seen[id_], filename)
+                            % (shortId, seen[shortId], filename)
                         )
                 else:
-                    seen[id_] = filename
-                    result[id_] = read
+                    seen[shortId] = filename
+                    result[shortId] = read
 
         self.report(
-            "Read %d reference genome%s:\n%s"
+            "Read %d reference genome%s with short id%s:\n%s"
             % (
                 len(result),
                 s(len(result)),
-                "\n".join("  %s" % id_ for id_ in sorted(result)),
+                s(len(result)),
+                "\n".join("  %s" % shortId for shortId in sorted(result)),
             ),
             requiredVerbosityLevel=2,
         )
@@ -693,13 +714,13 @@ class ReadAnalysis:
         """
         Remove all pre-existing files from the top-level output directory.
         """
-        paths = list(map(str, chain(Path(self.outputDir).glob("result-summary.txt"))))
+        paths = list(map(str, chain(self.outputDir.glob("result-summary.txt"))))
 
         if paths:
             self.report(
                 "    Removing %d pre-existing output file%s from "
                 "top-level output directory %s."
-                % (len(paths), s(len(paths)), self.outputDir),
+                % (len(paths), s(len(paths)), str(self.outputDir)),
                 requiredVerbosityLevel=2,
             )
             list(map(unlink, paths))
@@ -784,13 +805,13 @@ class ReadAnalysis:
         @param genomeLength: The C{int} length of the genome the reads were
             aligned to.
         @param significantOffsets: A C{set} of signifcant offsets.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
-        filename = join(outputDir, "coverage-and-significant-offsets.html")
-        self.report("    Saving coverage and significant offset plot to", filename)
+        filename = outputDir / "coverage-and-significant-offsets.html"
+        self.report("    Saving coverage and significant offset plot to", str(filename))
         title = "Coverage and significant offsets for alignment of %s in %s" % (
             referenceId,
-            alignmentFile,
+            str(alignmentFile),
         )
         plotCoverageAndSignificantLocations(
             readCountAtOffset, genomeLength, significantOffsets, filename, title=title
@@ -802,20 +823,20 @@ class ReadAnalysis:
 
         @param referenceId: The C{str} id of the reference sequence.
         @param alignmentFile: The C{str} name of an alignment file.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
-        filename = join(outputDir, "reference-consensus-samtools.fasta")
+        filename = outputDir / "reference-consensus-samtools.fasta"
         self.report("    Saving samtools reference consensus to", filename)
-        referenceFilename = join(outputDir, "reference.fasta")
+        referenceFilename = outputDir / "reference.fasta"
 
         e = Executor()
 
         e.execute(
-            "samtools mpileup -u -f %s %s 2>/dev/null | "
-            "bcftools call -c | vcfutils.pl vcf2fq | "
-            "filter-fasta.py --fastq --saveAs fasta --quiet "
-            "--idLambda 'lambda _: \"consensus-%s-samtools\"' > %s"
-            % (referenceFilename, alignmentFile, referenceId, filename)
+            f"make-consensus.py --reference {quoted(referenceFilename)} "
+            f"--bam {quoted(alignmentFile)} | "
+            f"filter-fasta.py --quiet "
+            f"--idLambda 'lambda _: \"consensus-{referenceId}-samtools\"' "
+            f"> {quoted(filename)}"
         )
 
         if self.verbose > 1:
@@ -827,9 +848,9 @@ class ReadAnalysis:
         Save the significant offsets.
 
         @param significantOffsets: A C{set} of signifcant offsets.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
-        filename = join(outputDir, "significant-offsets.txt")
+        filename = outputDir / "significant-offsets.txt"
         self.report("    Saving significant offsets to", filename)
         with open(filename, "w") as fp:
             for offset in significantOffsets:
@@ -839,13 +860,13 @@ class ReadAnalysis:
         """
         Save the base nucleotide frequencies.
 
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         @param genomeLength: The C{int} length of the genome the reads were
             aligned to.
         @param baseCountAtOffset: A C{list} of C{Counter} instances giving
             the count of each nucleotide at each genome offset.
         """
-        filename = join(outputDir, "base-frequencies.txt")
+        filename = outputDir / "base-frequencies.txt"
         self.report("    Saving base nucleotide frequencies to", filename)
 
         genomeLengthWidth = int(log10(genomeLength)) + 1
@@ -883,9 +904,9 @@ class ReadAnalysis:
         @param readCountAtOffset: A C{list} of C{int} counts of the total
             number of reads at each genome offset (i.e., just the sum of the
             values in C{baseCountAtOffset})
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
-        filename = join(outputDir, "reference-base-frequencies.html")
+        filename = outputDir / "reference-base-frequencies.html"
         self.report("    Writing reference base frequency plot to", filename)
         plotBaseFrequencies(
             significantOffsets,
@@ -897,6 +918,7 @@ class ReadAnalysis:
             homogeneousCutoff=self.homogeneousCutoff,
             histogram=False,
             show=False,
+            yRange=None,
         )
 
     def saveReducedFasta(self, significantOffsets, outputDir):
@@ -905,7 +927,7 @@ class ReadAnalysis:
         significant offsets.
 
         @param significantOffsets: A C{set} of signifcant offsets.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
         self.report("    Saving reduced FASTA")
         print("    Saving reduced FASTA not implemented yet")
@@ -918,4 +940,4 @@ class ReadAnalysis:
 
         FastaReads(self.fastaFile).filter(keepSites=significantOffsets).filter(
             modifier=unwanted
-        ).save(join(outputDir, "reduced.fasta"))
+        ).save(outputDir / "reduced.fasta")

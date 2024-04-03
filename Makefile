@@ -3,16 +3,14 @@
 XARGS := xargs $(shell test $$(uname) = Linux && echo -r)
 
 check:
-	python -m discover
-
-tcheck:
-	trial --rterrors test
+	pytest
 
 clean:
 	rm -fr _trial_temp dist midtools.egg-info
 	find . -name '*.pyc' -print0 | $(XARGS) -0 rm
 	find . -name '*~' -print0 | $(XARGS) -0 rm
 	make -C simulations clean
+	find . -type d -name '.*_cache' -print0 | $(XARGS) -0 rm -r
 
 flake8:
 	find midtools bin -name '*.py' -print0 | $(XARGS) -0 flake8

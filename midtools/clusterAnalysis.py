@@ -1,4 +1,3 @@
-from os.path import join
 from collections import defaultdict, Counter
 
 from dark.dna import compareDNAReads
@@ -17,6 +16,7 @@ from midtools.utils import (
     commonest,
     fastaIdentityTable,
     nucleotidesToStr,
+    quoted,
     s,
 )
 
@@ -59,6 +59,9 @@ class ClusterComponent:
     """
     Hold information about a set of reads that share significant offsets
     and which (largely) agree on the nucleotides present at those offsets.
+
+    @param reads: A C{list} of C{AlignedSegment} instances.
+    @param nucleotides: A C{midtools.offsets.OffsetBases} instance.
     """
 
     def __init__(self, reads, nucleotides):
@@ -130,7 +133,7 @@ class ClusterComponent:
             offsets.
         @param referenceSequence: The C{str} reference sequence.
         @param consensusFp: A file pointer to write the consensus to.
-        @param drawFp: A file pointer to write draw (and other) info to.
+        @param infoFp: A file pointer to write draw (and other) info to.
         """
         sequence = self.consensusSequence(componentOffsets, referenceSequence, infoFp)
         id_ = "consistent-component-%d-consensus (based on %d reads)" % (
@@ -174,10 +177,12 @@ class ClusterComponent:
 
 class ComponentByOffsets:
     """
-    Hold information about a set of reads that share significant offsets
-    regardless of the nucleotides present at those offsets. Create a list
-    of subsets of these reads (ConsistentComponent instances) that are
-    consistent in the nucleotides at their offsets.
+    Hold information about a set of reads that share significant offsets,
+    regardless of the nucleotides present at those offsets.
+
+    Provide a methodt to create a list of subsets of these reads
+    (ConsistentComponent instances) that are (largely) consistent in the
+    nucleotides at their shared offsets.
 
     @param reads: A C{list} of C{AlignedSegment} instances.
     @param offsets: A C{set} of significant offsets covered by C{reads}.
@@ -240,14 +245,19 @@ class ComponentByOffsets:
             cc.summarize(fp, i, self.offsets, referenceSequence)
 
     def saveFasta(self, outputDir, count, verbose):
+        """
+        @param outputDir: The C{Path} to the output directory.
+        @param count: The C{int} number of this component.
+        @param verbose: The C{int}, verbosity level. Use C{0} for no output.
+        """
         for i, cc in enumerate(self.consistentComponents, start=1):
-            filename = join(outputDir, "component-%d-%d.fasta" % (count, i))
+            filename = outputDir / ("component-%d-%d.fasta" % (count, i))
             if verbose > 1:
                 print("      Saving component %d %d FASTA to" % (count, i), filename)
             with open(filename, "w") as fp:
                 cc.saveFasta(fp)
 
-            filename = join(outputDir, "component-%d-%d-padded.fasta" % (count, i))
+            filename = outputDir / ("component-%d-%d-padded.fasta" % (count, i))
             if verbose > 1:
                 print(
                     "      Saving component %d %d padded FASTA to" % (count, i),
@@ -267,7 +277,7 @@ class ComponentByOffsets:
         """
         readClusters = ReadClusters()
 
-        # Using sort here makes the clustering result deterministic.
+        # Using 'sorted' here makes the clustering result deterministic.
         for read in sorted(self.reads):
             readClusters.add(read)
 
@@ -282,15 +292,15 @@ class ComponentByOffsets:
 
     def saveConsensuses(self, outputDir, count, referenceSequence, verbose):
         """
-        Write out a summary of this component.
+        Write a consensus sequence for each consistent component of this component.
 
-        @param outDir: The C{str} output directory.
+        @param outputDir: The C{Path} to the output directory.
         @param count: The C{int} number of this component.
         @param referenceSequence: The C{str} reference sequence.
         @param verbose: The C{int}, verbosity level. Use C{0} for no output.
         """
-        consensusFilename = join(outputDir, "component-%d-consensuses.fasta" % count)
-        infoFilename = join(outputDir, "component-%d-consensuses.txt" % count)
+        consensusFilename = outputDir / ("component-%d-consensuses.fasta" % count)
+        infoFilename = outputDir / ("component-%d-consensuses.txt" % count)
         if verbose:
             print(
                 "      Saving component %d consensus FASTA to %s\n"
@@ -302,7 +312,7 @@ class ComponentByOffsets:
         ) as infoFp:
             # First write the reference sequence for this component.
             (reference,) = list(
-                FastaReads(join(outputDir, "reference-component-%d.fasta" % count))
+                FastaReads(outputDir / ("reference-component-%d.fasta" % count))
             )
             print(reference.toString("fasta"), file=consensusFp, end="")
             for i, cc in enumerate(self.consistentComponents, start=1):
@@ -312,8 +322,8 @@ class ComponentByOffsets:
 
         # Write out an HTML table showing the identity between the various
         # component consensuses.
-        identityTableFilename = join(
-            outputDir, "component-%d-consensuses-identity.html" % count
+        identityTableFilename = outputDir / (
+            "component-%d-consensuses-identity.html" % count
         )
         if verbose:
             print(
@@ -329,10 +339,14 @@ class ClusterAnalysis(ReadAnalysis):
     Perform a clustered read alignment analysis for multiple infection
     detection.
 
+    @param sampleName: The C{str} name of the sample whose reads are being
+        analysed.
     @param alignmentFiles: A C{list} of C{str} names of SAM/BAM alignment
-        files.
+        files. These files should have mappings of reads to all references
+        (as produced using the --all option when running bowtie2).
     @param referenceGenomeFiles: A C{list} of C{str} names of FASTA files
         containing reference genomes.
+    @param outputDir: The C{Path} to the output directory.
     @param referenceIds: The C{str} sequence ids whose alignment should be
         analyzed. All ids must be present in the C{referenceGenomes} files.
         One of the SAM/BAM files given using C{alignmentFiles} should have an
@@ -343,7 +357,6 @@ class ClusterAnalysis(ReadAnalysis):
     @param alternateNucleotideMinFreq: The C{float} frequency that an
         alternative nucleotide (i.e., not the one chosen for the consensus)
         must have in order to be selected for the alternate consensus.
-    @param outputDir: The C{str} directory to save result files to.
     @param minReads: The C{int} minimum number of reads that must cover a
         location for it to be considered significant.
     @param homogeneousCutoff: If the most common nucleotide at a location
@@ -352,8 +365,12 @@ class ClusterAnalysis(ReadAnalysis):
         homogeneous and therefore uninteresting.
     @param plotSAM: If C{True} save plots of where reads lie on each reference
         genome (can be slow).
+    @param plotAllReferencesSAM: If C{True}, save a plot showing where reads are
+        aligned to on the genome along with their alignment scores. This will
+        show all reads as they are aligned to (possibly unequal-length)
+        references (can be slow).
     @param saveReducedFASTA: If C{True}, write out a FASTA file of the original
-        input but with just the signifcant locations.
+        input but with just the significant locations.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
     """
 
@@ -362,27 +379,30 @@ class ClusterAnalysis(ReadAnalysis):
 
     def __init__(
         self,
+        sampleName,
         alignmentFiles,
         referenceGenomeFiles,
+        outputDir,
         referenceIds=None,
-        maxClusterDist=DEFAULT_MAX_CLUSTER_DIST,
-        alternateNucleotideMinFreq=ALTERNATE_NUCLEOTIDE_MIN_FREQ_DEF,
-        outputDir=None,
         minReads=ReadAnalysis.DEFAULT_MIN_READS,
+        maxClusterDist=DEFAULT_MAX_CLUSTER_DIST,
         homogeneousCutoff=ReadAnalysis.DEFAULT_HOMOGENEOUS_CUTOFF,
         plotSAM=False,
+        plotAllReferencesSAM=False,
+        alternateNucleotideMinFreq=ALTERNATE_NUCLEOTIDE_MIN_FREQ_DEF,
         saveReducedFASTA=False,
         verbose=0,
     ):
-        ReadAnalysis.__init__(
-            self,
+        super().__init__(
+            sampleName,
             alignmentFiles,
             referenceGenomeFiles,
+            outputDir,
             referenceIds=referenceIds,
-            outputDir=outputDir,
             minReads=minReads,
             homogeneousCutoff=homogeneousCutoff,
             plotSAM=plotSAM,
+            plotAllReferencesSAM=plotAllReferencesSAM,
             saveReducedFASTA=saveReducedFASTA,
             verbose=verbose,
         )
@@ -397,10 +417,10 @@ class ClusterAnalysis(ReadAnalysis):
 
         @param referenceId: The C{str} id of the reference sequence to analyze.
         @param alignmentFile: The C{str} name of an alignment file.
-        @param outputDir: The C{str} name of the output directory.
+        @param outputDir: The C{Path} to the output directory.
         @return: C{None} if C{referenceId} is not present in C{alignmentFile}
             or if no significant offsets are found. Else, a C{dict} containing
-            the signifcant offsets and the consensus sequence that best matches
+            the significant offsets and the consensus sequence that best matches
             C{referenceId}.
         """
         analysis = self.initialReferenceIdAnalysis(
@@ -467,6 +487,7 @@ class ClusterAnalysis(ReadAnalysis):
 
         self.plotConsistentComponents(
             referenceId,
+            alignedReads,
             alignmentFile,
             genomeLength,
             components,
@@ -476,6 +497,7 @@ class ClusterAnalysis(ReadAnalysis):
 
         self.saveConsensusBaseFrequencyPlot(
             referenceId,
+            alignedReads,
             genomeLength,
             consensusWantedReadsBaseCountAtOffset,
             consensusReadCountAtOffset,
@@ -493,16 +515,16 @@ class ClusterAnalysis(ReadAnalysis):
         Find all connected components.
 
         @param alignedReads: A list of C{AlignedRead} instances.
-        @param significantOffsets: A C{set} of signifcant offsets.
-        @param outputDir: The C{str} name of the output directory.
-        @return: A C{list} of C{connectedComponentsByOffset} instances,
+        @param significantOffsets: A C{set} of significant offsets.
+        @param outputDir: The C{Path} to the output directory.
+        @return: A C{list} of C{ComponentByOffsets} instances,
             sorted by component (the smallest offset is used for sorting
             so this gives the components from left to right along the
             reference genome.
         """
         significantReads = set(read for read in alignedReads if read.significantOffsets)
         components = []
-        filename = join(outputDir, "cluster-analysis.txt")
+        filename = outputDir / "cluster-analysis.txt"
         self.report("    Saving clustering steps to", filename)
 
         with open(filename, "w") as fp:
@@ -523,7 +545,7 @@ class ClusterAnalysis(ReadAnalysis):
         """
         Save FASTA for each component.
 
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
         self.report("    Saving component FASTA")
         for count, component in enumerate(components, start=1):
@@ -536,11 +558,11 @@ class ClusterAnalysis(ReadAnalysis):
 
         @param referenceId: The C{str} id of the reference sequence.
         @param components: A C{list} of C{ComponentByOffsets} instances.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
         reference = self.referenceGenomes[referenceId]
         for count, component in enumerate(components, start=1):
-            filename = join(outputDir, "reference-component-%d.fasta" % count)
+            filename = outputDir / ("reference-component-%d.fasta" % count)
             self.report("    Saving reference component %d to %s" % (count, filename))
             read = Read(reference.id + "-component-%d" % count, reference.sequence)
 
@@ -549,6 +571,7 @@ class ClusterAnalysis(ReadAnalysis):
     def plotConsistentComponents(
         self,
         referenceId,
+        alignedReads,
         alignmentFile,
         genomeLength,
         components,
@@ -559,16 +582,19 @@ class ClusterAnalysis(ReadAnalysis):
         Make a plot of all consistent connected components.
 
         @param referenceId: The C{str} id of the reference sequence.
+        @param alignedReads: A list of C{AlignedRead} instances.
         @param alignmentFile: The C{str} name of an alignment file.
         @param genomeLength: The C{int} length of the genome the reads were
             aligned to.
-        @param significantOffsets: A C{set} of signifcant offsets.
-        @param outputDir: A C{str} directory path.
+        @param components: A C{list} of C{ComponentByOffsets} instances.
+        @param significantOffsets: A C{set} of significant offsets.
+        @param outputDir: The C{Path} to the output directory.
         """
-        filename = join(outputDir, "consistent-components-plot.html")
+        filename = outputDir / "consistent-components-plot.html"
         self.report("    Plotting consistent connected components to", filename)
-        infoFilename = join(outputDir, "consistent-components-plot.txt")
+        infoFilename = outputDir / "consistent-components-plot.txt"
         self.report("    Writing consistent connected component info to", infoFilename)
+
         plotConsistentComponents(
             referenceId,
             genomeLength,
@@ -579,8 +605,11 @@ class ClusterAnalysis(ReadAnalysis):
             outputDir,
             titleFontSize=17,
             axisFontSize=15,
-            title="%s consistent connected components<br>from file %s"
-            % (referenceId, self.shortAlignmentFilename[alignmentFile]),
+            title=(
+                f"Consistent connected components when mapping {len(alignedReads)} "
+                f"reads from {self.sampleName} against {referenceId}<br>from file "
+                f"{self.shortAlignmentFilename[alignmentFile]}"
+            ),
         )
 
     def saveClosestReferenceConsensus(
@@ -608,7 +637,7 @@ class ClusterAnalysis(ReadAnalysis):
             of 2-tuples, with each 2-tuple containing an offset into the
             reference sequence and the C{str} of nucleotide that would be
             inserted starting at that offset.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         @return: A tuple of (consensus, unwantedReads, wantedCcReadCount,
                  wantedReadsCountAtOffset, wantedReadsBaseCountAtOffset).
         """
@@ -695,7 +724,7 @@ class ClusterAnalysis(ReadAnalysis):
         else:
             referenceIdRest = " " + fields[1]
 
-        infoFile = join(outputDir, "reference-consensus.txt")
+        infoFile = outputDir / "reference-consensus.txt"
         self.report("    Saving closest consensus to reference info to", infoFile)
 
         with open(infoFile, "w") as infoFp:
@@ -936,12 +965,12 @@ class ClusterAnalysis(ReadAnalysis):
             else:
                 print("\nReference insertions: none.", file=infoFp)
 
-        filename = join(outputDir, "reference-consensus.fasta")
+        filename = outputDir / "reference-consensus.fasta"
         self.report("    Saving consensus to", filename)
         Reads([consensus]).save(filename)
 
         wantedCcReadCount = 0
-        filename = join(outputDir, "cc-wanted.fastq")
+        filename = outputDir / "cc-wanted.fastq"
         with open(filename, "w") as fp:
             for wantedCcRead in wantedReads:
                 alignment = wantedCcRead.alignment
@@ -993,10 +1022,10 @@ class ClusterAnalysis(ReadAnalysis):
             values in C{baseCountAtOffset})
         @param genomeLength: The C{int} length of the genome the reads were
             aligned to.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         @return: An alternate consensus C{dark.reads.Read} instance.
         """
-        filename = join(outputDir, "reference-alternate-consensus.txt")
+        filename = outputDir / "reference-alternate-consensus.txt"
         self.report("    Writing alternate consensus info to", filename)
         alternateConsensus = []
 
@@ -1114,19 +1143,26 @@ class ClusterAnalysis(ReadAnalysis):
                 file=infoFp,
             )
 
-        filename = join(outputDir, "reference-alternate-consensus.fasta")
+        filename = outputDir / "reference-alternate-consensus.fasta"
         self.report("    Saving alternate consensus FASTA to", filename)
         Reads([alternateConsensusRead]).save(filename)
 
         return alternateConsensusRead
 
     def saveConsensusBaseFrequencyPlot(
-        self, referenceId, genomeLength, baseCountAtOffset, readCountAtOffset, outputDir
+        self,
+        referenceId,
+        alignedReads,
+        genomeLength,
+        baseCountAtOffset,
+        readCountAtOffset,
+        outputDir,
     ):
         """
         Make a plot of the sorted base frequencies for the consensus.
 
         @param referenceId: The C{str} id of the reference sequence.
+        @param alignedReads: A C{list} of C{AlignedRead} instances.
         @param genomeLength: The C{int} length of the genome the reads were
             aligned to.
         @param baseCountAtOffset: A C{list} of C{Counter} instances giving
@@ -1134,9 +1170,9 @@ class ClusterAnalysis(ReadAnalysis):
         @param readCountAtOffset: A C{list} of C{int} counts of the total
             number of reads at each genome offset (i.e., just the sum of the
             values in C{baseCountAtOffset})
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
-        filename = join(outputDir, "consensus-base-frequencies.html")
+        filename = outputDir / "consensus-base-frequencies.html"
         self.report("    Writing consensus base frequency plot to", filename)
 
         significantOffsets = list(
@@ -1148,12 +1184,18 @@ class ClusterAnalysis(ReadAnalysis):
             )
         )
 
+        title = (
+            f"Significant sites base frequencies when mapping {len(alignedReads)} "
+            f"reads from {self.sampleName} against the {referenceId} "
+            f"consensus (length {genomeLength})."
+        )
+
         plotBaseFrequencies(
             significantOffsets,
             baseCountAtOffset,
             readCountAtOffset,
             filename,
-            title="%s consensus (length %d)" % (referenceId, genomeLength),
+            title=title,
             minReads=self.minReads,
             homogeneousCutoff=self.homogeneousCutoff,
             histogram=False,
@@ -1166,7 +1208,7 @@ class ClusterAnalysis(ReadAnalysis):
 
         @param referenceId: The C{str} id of the reference sequence.
         @param components: A C{list} of C{ComponentByOffsets} instances.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
         self.report("    Saving component consensuses")
         reference = self.referenceGenomes[referenceId]
@@ -1189,14 +1231,14 @@ class ClusterAnalysis(ReadAnalysis):
 
         @param referenceId: The C{str} id of the reference sequence.
         @param alignedReads: A C{list} of C{AlignedRead} instances.
-        @param significantOffsets: A C{set} of signifcant offsets.
+        @param significantOffsets: A C{set} of significant offsets.
         @param components: A C{list} of C{ComponentByOffsets} instances.
         @param genomeLength: The C{int} length of the genome the reads were
             aligned to.
-        @param outputDir: A C{str} directory path.
+        @param outputDir: The C{Path} to the output directory.
         """
-        filename = join(outputDir, "component-summary.txt")
-        self.report("    Writing analysis summary to", filename)
+        filename = outputDir / "component-summary.txt"
+        self.report(f"    Writing analysis summary to {quoted(filename)}.")
         reference = self.referenceGenomes[referenceId]
 
         with open(filename, "w") as fp:
@@ -1214,8 +1256,10 @@ class ClusterAnalysis(ReadAnalysis):
 
             totalReads = 0
             for count, component in enumerate(components, start=1):
-                filename = join(outputDir, "component-%d.txt" % count)
-                self.report("    Writing component %d summary to" % count, filename)
+                filename = outputDir / ("component-%d.txt" % count)
+                self.report(
+                    f"    Writing component {count} summary to {quoted(filename)}."
+                )
                 with open(filename, "w") as fp2:
                     component.summarize(fp2, count, reference.sequence)
 

@@ -17,7 +17,7 @@ case $# in
         ;;
 
     *)
-        echo "$(basename $0): expected 10 arguments!" >&2
+        echo "$(basename $0): expected 12 arguments!" >&2
         exit 1
         ;;
 esac

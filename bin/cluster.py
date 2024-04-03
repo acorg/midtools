@@ -46,16 +46,18 @@ if __name__ == "__main__":
     referenceIds = (
         list(chain.from_iterable(args.referenceId)) if args.referenceId else None
     )
+
     ClusterAnalysis(
-        alignmentFiles=list(chain.from_iterable(args.alignmentFile)),
-        referenceGenomeFiles=list(chain.from_iterable(args.referenceGenome)),
+        args.sampleName,
+        list(chain.from_iterable(args.alignmentFile)),
+        list(chain.from_iterable(args.referenceGenome)),
+        args.outputDir,
         referenceIds=referenceIds,
-        maxClusterDist=args.maxClusterDist,
-        alternateNucleotideMinFreq=args.alternateNucleotideMinFreq,
-        outputDir=args.outputDir,
         minReads=args.minReads,
+        maxClusterDist=args.maxClusterDist,
         homogeneousCutoff=args.homogeneousCutoff,
-        saveReducedFASTA=args.saveReducedFASTA,
         plotSAM=args.plotSAM,
+        alternateNucleotideMinFreq=args.alternateNucleotideMinFreq,
+        saveReducedFASTA=args.saveReducedFASTA,
         verbose=args.verbose,
     ).run()

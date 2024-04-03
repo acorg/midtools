@@ -2,10 +2,8 @@
 
 import argparse
 import sys
-from os import mkdir
-from os.path import exists, join
 from random import choice
-from six.moves import shlex_quote as quote
+from pathlib import Path
 
 from dark.fasta import FastaReads
 from dark.process import Executor
@@ -14,46 +12,66 @@ from dark.reads import Reads
 from midtools.mutate import mutateRead
 
 
-def main(args, logfp):
+def main(args, outDir, logfp):
     """
     Create genomes and reads for a multiple infection detection experiment.
 
-    @param args: A namespace instance, as returned by parse_args
+    @param args: An argparse C{Namespace} instance, as returned by C{parse_args}.
+    @param outDir: A C{Path} to the output directly.
     @param logfp: A file object to write log information to.
     """
     print("Invocation arguments", args, file=logfp)
 
-    qOutputDir = quote(args.outputDir)
-    genome1 = join(qOutputDir, "genome-1.fasta")
-    genome2 = join(qOutputDir, "genome-2.fasta")
-    genome2locations = join(qOutputDir, "genome-2.locations")
-    reads1 = join(qOutputDir, "reads-1.fastq")
-    reads2 = join(qOutputDir, "reads-2.fastq")
-    reads12 = join(qOutputDir, "reads-12.fastq")
+    # Use genome1 values if the genome2 values are not specified.
+    if args.genome2ReadCount is None:
+        args.genome2ReadCount = args.genome1ReadCount
+        print(
+            f"Genome 2 read count defaulting to genome 1 value "
+            f"({args.genome2ReadCount}).",
+            file=sys.stderr,
+        )
 
-    executor = Executor(args.dryRun)
+    if args.genome2ReadMutationRate is None:
+        args.genome2ReadMutationRate = args.genome1ReadMutationRate
+        print(
+            f"Genome 2 read mutation rate defaulting to genome 1 value "
+            f"({args.genome2ReadMutationRate:.3f}).",
+            file=sys.stderr,
+        )
 
+    genome1 = outDir / "genome-1.fasta"
+    genome2 = outDir / "genome-2.fasta"
+    genome2locations = outDir / "genome-2.locations"
+
+    reads1 = outDir / "reads-1.fastq"
+    reads2 = outDir / "reads-2.fastq"
+    reads12 = outDir / "reads-12.fastq"
+
+    executor = Executor()
+    execute = executor.execute
+
+    # Make genome 1.
     if args.genome1Filename:
-        executor.execute("ln -s %s %s" % (quote(args.genome1Filename), genome1))
+        execute(f"ln -s {args.genome1Filename!r} {str(genome1)!r}")
     else:
         if args.genomeLength < 1:
             print("Random initial genome length must be > 0.", file=sys.stderr)
-            sys.exit(3)
+            sys.exit(1)
         print(
-            "Writing random starting genome of length %d to %s"
-            % (args.genomeLength, genome1),
+            f"Writing random starting genome of length {args.genomeLength} to "
+            f"{str(genome1)!r}",
             file=logfp,
         )
-        if not args.dryRun:
-            sequence = "".join([choice("ACGT") for _ in range(args.genomeLength)])
-            with open(genome1, "w") as fp:
-                print(">genome-1\n%s" % sequence, file=fp)
+        sequence = "".join([choice("ACGT") for _ in range(args.genomeLength)])
+        with open(genome1, "w") as fp:
+            print(">genome-1\n%s" % sequence, file=fp)
 
+    # Make genome 2.
     if args.genome2Filename:
-        executor.execute("ln -s %s %s" % (quote(args.genome2Filename), genome2))
+        execute(f"ln -s {args.genome2Filename!r} {str(genome2)!r}")
     else:
-        # Make a second genome using the given mutation rate. Print its
-        # mutated locations to a file.
+        # Make a second genome (from the first genome) using the given
+        # mutation rate. Print its mutated locations to a file.
         (genome1read,) = list(FastaReads(genome1))
         offsets = mutateRead(genome1read, args.genome2MutationRate)
         with open(genome2locations, "w") as fp:
@@ -61,33 +79,32 @@ def main(args, logfp):
         genome1read.id = "genome-2"
         Reads([genome1read]).save(genome2)
 
+    # Make reads.
     cmdPrefix = (
-        "create-reads.py --maxReadLength %d --minReadLength %d "
-        "--meanLength %d --sdLength %d --rate %f "
-        % (
-            args.maxReadLength,
-            args.minReadLength,
-            args.meanReadLength,
-            args.sdReadLength,
-            args.readMutationRate,
-        )
+        f"create-reads.py "
+        f"--maxReadLength {args.maxReadLength} "
+        f"--minReadLength {args.minReadLength} "
+        f"--meanLength {args.meanReadLength} "
+        f"--sdLength {args.sdReadLength} "
     )
 
     for info in [
         {
-            "reads": reads1,
-            "fasta": genome1,
+            "reads": str(reads1),
+            "fasta": str(genome1),
             "number": 1,
-            "count": args.genome1ReadCount or args.readCount,
+            "count": args.genome1ReadCount,
+            "rate": args.genome1ReadMutationRate,
         },
         {
-            "reads": reads2,
-            "fasta": genome2,
+            "reads": str(reads2),
+            "fasta": str(genome2),
             "number": 2,
-            "count": args.genome2ReadCount or args.readCount,
+            "count": args.genome2ReadCount,
+            "rate": args.genome2ReadMutationRate,
         },
     ]:
-        executor.execute(
+        execute(
             cmdPrefix
             + (
                 "--idPrefix genome-%(number)d-read- "
@@ -95,7 +112,7 @@ def main(args, logfp):
             )
         )
 
-    executor.execute("cat %s %s > %s" % (reads1, reads2, reads12))
+    execute(f"cat {str(reads1)!r} {str(reads2)!r} > {str(reads12)!r}")
 
     print("\n".join(executor.log), file=logfp)
 
@@ -103,14 +120,10 @@ def main(args, logfp):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="Create data for a dual infection experiment",
+        description="Create data for a double-infection experiment.",
     )
 
-    parser.add_argument(
-        "--outputDir",
-        required=True,
-        help="The output directory. Must not already exist.",
-    )
+    parser.add_argument("--outDir", required=True, help="The output directory.")
 
     parser.add_argument(
         "--genome1Filename",
@@ -125,49 +138,39 @@ if __name__ == "__main__":
         help=(
             "The FASTA file containing the second genome to create reads "
             "from. If not specified, a genome will be created from the "
-            "first genome."
+            "first genome using a mutation rate given by "
+            "--genome2MutationRate."
         ),
-    )
-
-    parser.add_argument(
-        "--genomeLength",
-        type=int,
-        default=100,
-        help=("If any random genomes need to be made, this will be their length."),
-    )
-
-    parser.add_argument(
-        "--dryRun",
-        action="store_true",
-        help="If specified, simply print the actions that would be taken.",
-    )
-
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help=("If specified, overwrite the contents of the --outputDir directory"),
     )
 
     parser.add_argument(
         "--genome2MutationRate",
         type=float,
-        default=0.075,
-        help="The per-base mutation rate to use to create the second genome "
-        "(if it is not provided by --genome2File).",
+        default=0.05,
+        help=(
+            "The per-base mutation rate to use to create the second genome from "
+            "genome 1 (if that genome is not provided by --genome2File)."
+        ),
     )
 
     parser.add_argument(
-        "--readCount",
-        type=int,
-        default=100,
+        "--genome1ReadMutationRate",
+        type=float,
+        help="The per-base mutation rate to use when creating reads from genome 1.",
+    )
+
+    parser.add_argument(
+        "--genome2ReadMutationRate",
+        type=float,
         help=(
-            "The number of reads to create for both genomes (only used "
-            "if --genome1ReadCount or --genome2ReadCount are not given)."
+            "The per-base mutation rate to use when creating reads from the second "
+            "genome. If not given, the --genome1ReadMutationRate value will be used."
         ),
     )
 
     parser.add_argument(
         "--genome1ReadCount",
+        default=100,
         type=int,
         help="The number of reads to create for genome 1.",
     )
@@ -175,13 +178,29 @@ if __name__ == "__main__":
     parser.add_argument(
         "--genome2ReadCount",
         type=int,
-        help="The number of reads to create for genome 2.",
+        help=(
+            "The number of reads to create for genome 2. If not "
+            "given, the value of --genome1ReadCount will be used"
+        ),
+    )
+
+    parser.add_argument(
+        "--genomeLength",
+        type=int,
+        default=100,
+        help="If any random genomes need to be made, this will be their length.",
+    )
+
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="If specified, overwrite the contents of the --outDir directory",
     )
 
     parser.add_argument(
         "--minReadLength",
         type=int,
-        default=10,
+        default=30,
         help="The minimum length read to create.",
     )
 
@@ -191,18 +210,10 @@ if __name__ == "__main__":
         default=100,
         help="The maximum length read to create.",
     )
-
-    parser.add_argument(
-        "--readMutationRate",
-        type=float,
-        default=0.01,
-        help="The per-base mutation rate to use to create reads.",
-    )
-
     parser.add_argument(
         "--meanReadLength",
         type=float,
-        default=100.0,
+        default=80.0,
         help="The mean length of created reads.",
     )
 
@@ -216,21 +227,22 @@ if __name__ == "__main__":
     parser.add_argument(
         "--qualityChar",
         default="I",
-        help="The quality character to use for all read quality scores",
+        help="The quality character to use for all read quality scores.",
     )
 
     args = parser.parse_args()
 
-    if exists(args.outputDir):
-        if not args.dryRun and not args.force:
+    outDir = Path(args.outDir)
+
+    if outDir.exists():
+        if not args.force:
             print(
-                "Output directory %r already exists. Exiting." % args.outputDir,
+                f"Output directory {str(outDir)!r} already exists. Exiting.",
                 file=sys.stderr,
             )
-            sys.exit(2)
+            sys.exit(1)
     else:
-        if not args.dryRun:
-            mkdir(args.outputDir)
+        outDir.mkdir()
 
-    with open(join(args.outputDir, "LOG"), "w") as logfp:
-        main(args, logfp)
+    with open(outDir / "LOG", "w") as logfp:
+        main(args, outDir, logfp)

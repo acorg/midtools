@@ -54,8 +54,7 @@ class GreadyAnalysis(ReadAnalysis):
         saveReducedFASTA=False,
         verbose=0,
     ):
-        ReadAnalysis.__init__(
-            self,
+        super().__init__(
             alignmentFiles,
             referenceGenomeFiles,
             referenceIds=referenceIds,

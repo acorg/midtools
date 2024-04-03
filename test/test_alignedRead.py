@@ -31,7 +31,7 @@ class TestAlignedRead(TestCase):
         is negative.
         """
         ar = AlignedRead("id", "---ACGTACGT--")
-        error = "^Trim amount \(-4\) cannot be negative\.$"
+        error = r"^Trim amount \(-4\) cannot be negative\.$"
         self.assertRaisesRegex(AssertionError, error, ar.trim, -4)
 
     def testTrimWithReadTooShort(self):

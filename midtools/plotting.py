@@ -1,9 +1,14 @@
+import sys
 from random import uniform
 import plotly
-from os.path import join
+from plotly.subplots import make_subplots
 import plotly.graph_objs as go
+import plotly.express as px
 from operator import itemgetter
 from json import dump
+from itertools import cycle
+from collections import Counter, defaultdict
+from textwrap import wrap
 
 from dark.dna import compareDNAReads
 from dark.fasta import FastaReads
@@ -11,6 +16,11 @@ from dark.fasta import FastaReads
 from midtools.entropy import entropy2, MAX_ENTROPY
 from midtools.match import matchToString
 from midtools.utils import s, baseCountsToStr
+
+# The following import will fail for those that don't have our hbv repo.
+# For now, just let the ImportError happen.
+from pyhbv.genotype import getGenotype, genotypeKey
+from pyhbv.samples import UNKNOWN, sampleIdKey
 
 
 def plotSAM(
@@ -23,7 +33,7 @@ def plotSAM(
     jitter=0.0,
 ):
     """
-    Plot the alignments in a SAM file.
+    Plot the alignments found in a SAM file.
     """
     referenceLengths = samFilter.referenceLengths()
 
@@ -46,7 +56,7 @@ def plotSAM(
         id_ = alignment.query_name
         data.append(
             go.Scatter(
-                x=(referenceStart, referenceStart + alignment.query_length),
+                x=(referenceStart, referenceStart + alignment.reference_length),
                 y=(score, score),
                 text=(id_, id_),
                 hoverinfo="text",
@@ -65,7 +75,6 @@ def plotSAM(
 
     yaxis = {
         "title": "score",
-        # 'range': (0.0, 1.0),
         "titlefont": {
             "size": axisFontSize,
         },
@@ -87,7 +96,157 @@ def plotSAM(
         hovermode="closest",
     )
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+
+
+def plotAllReferencesSAM(
+    samFilter,
+    outfile,
+    sampleName,
+    alignmentFile,
+    hbv=False,
+    jitter=0.0,
+    titleFontSize=14,
+    axisFontSize=12,
+    show=False,
+):
+    """
+    Plot the alignments found in a SAM file, even if the references are different
+    lengths.
+
+    @param sampleName: The C{str} name of the sample whose reads are being
+        analysed.
+    """
+    referenceLengths = samFilter.referenceLengths()
+    maxReferenceLength = max(referenceLengths.values())
+
+    if hbv:
+        referenceScaleFactor = dict(
+            (id_, maxReferenceLength / length)
+            for id_, length in referenceLengths.items()
+        )
+        referenceGenotype = dict(
+            (id_, getGenotype(id_) or UNKNOWN) for id_ in referenceLengths
+        )
+    else:
+        referenceScaleFactor = dict.fromkeys(referenceLengths, 1.0)
+        referenceGenotype = dict((id_, id_) for id_ in referenceLengths)
+
+    genotypes = sorted(set(referenceGenotype.values()), key=genotypeKey)
+    legendRank = dict((genotype, i) for i, genotype in enumerate(genotypes))
+    nGenotypes = len(genotypes)
+    genotypeReferences = defaultdict(set)
+
+    data = []
+    inLegend = set()
+    genotypeCount = Counter()
+
+    count = 0
+    for count, alignment in enumerate(samFilter.alignments(), start=1):
+        referenceId = alignment.reference_name
+        scaleFactor = referenceScaleFactor[referenceId]
+        start = alignment.reference_start
+        end = start + alignment.reference_length
+        score = alignment.get_tag("AS") + (
+            0.0 if jitter == 0.0 else uniform(-jitter, jitter)
+        )
+        genotype = referenceGenotype[referenceId]
+        genotypeCount[genotype] += 1
+        genotypeReferences[genotype].add(referenceId)
+        text = f"{referenceId} Read: {alignment.query_name}"
+        data.append(
+            go.Scatter(
+                x=(start * scaleFactor, end * scaleFactor),
+                y=(score, score),
+                text=(text, text),
+                hoverinfo="text",
+                mode="lines",
+                name=genotype,
+                legendgroup=genotype,
+                legendrank=legendRank[genotype],
+                showlegend=genotype not in inLegend,
+            )
+        )
+        inLegend.add(genotype)
+
+    xaxis = {
+        "title": "HBV genome location (scaled)" if hbv else "Genome location",
+        "range": (0, maxReferenceLength),
+        "titlefont": {
+            "size": axisFontSize,
+        },
+    }
+
+    yaxis = {
+        "title": "Bowtie2 alignment score",
+        "titlefont": {
+            "size": axisFontSize,
+        },
+    }
+
+    if hbv:
+        genotypeReferencesDesc = (
+            "Genotypes: "
+            + "; ".join(
+                (f"{gt}: " + ", ".join(sorted(genotypeReferences[gt], key=sampleIdKey)))
+                for gt in genotypes
+                if genotypeCount[gt]
+            )
+            + "."
+        )
+        sampleGenotypeDesc = f"(genotype {getGenotype(sampleName)}) "
+    else:
+        genotypeReferencesDesc = sampleGenotypeDesc = ""
+
+    jitterDesc = "" if jitter == 0.0 else f" y-jitter: {jitter:.2f}"
+
+    title = "<br>".join(
+        wrap(
+            f"Best-matched genotypes for {count} reads for {sampleName} "
+            f"{sampleGenotypeDesc}from {alignmentFile}. "
+            f"{genotypeReferencesDesc}{jitterDesc}",
+            width=120,
+        )
+    )
+
+    layout = go.Layout(
+        title=title,
+        xaxis=xaxis,
+        yaxis=yaxis,
+        titlefont={
+            "size": titleFontSize,
+        },
+        hovermode="closest",
+    )
+    fig = go.Figure(data=data, layout=layout)
+
+    # See "Color Sequences in Plotly Express" at
+    # https://plotly.com/python/discrete-color/ for color sequences.
+    colors = px.colors.qualitative.D3
+    if nGenotypes > len(colors):
+        print(
+            f"WARNING: You have more genotypes ({nGenotypes}) than unique "
+            f"colors ({len(colors)}). Some colors will be repeated.",
+            file=sys.stderr,
+        )
+
+    genotypeColor = {}
+    iterColors = cycle(colors)
+    for genotype in genotypes:
+        if genotypeCount[genotype]:
+            genotypeColor[genotype] = next(iterColors)
+
+    # Put the genotype read count into the legend labels and add the colors.
+    fig.for_each_trace(
+        lambda t: t.update(
+            name=f"{t.name} ({genotypeCount[t.name]})",
+            marker_color=genotypeColor[t.name],
+        )
+    )
+
+    fig.update_layout(legend_title_text="Genotype (total reads)")
+
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
 
 
 def _plotSortedMaxBaseFrequencies(
@@ -182,7 +341,7 @@ def _plotSortedMaxBaseFrequencies(
         },
     )
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
     return frequencyInfo
 
 
@@ -272,7 +431,7 @@ def _plotBaseFrequenciesEntropy(
         },
     )
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
     return entropyInfo
 
 
@@ -285,6 +444,7 @@ def _plotBaseFrequencies(
     show,
     titleFontSize,
     axisFontSize,
+    yRange,
 ):
     """
     Plot the (sorted) base frequencies for each of the significant offsets.
@@ -335,7 +495,7 @@ def _plotBaseFrequencies(
         },
         yaxis={
             "title": "Nucleotide frequency",
-            "range": (0.45, 1.0),
+            "range": yRange,
             "titlefont": {
                 "size": axisFontSize,
             },
@@ -343,7 +503,7 @@ def _plotBaseFrequencies(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
 
 
 def plotBaseFrequencies(
@@ -361,9 +521,13 @@ def plotBaseFrequencies(
     show=False,
     titleFontSize=12,
     axisFontSize=12,
+    yRange=(0.0, 1.0),
 ):
     """
     Plot sorted base frequencies at signifcant sites.
+
+    @param sampleName: The C{str} name of the sample whose reads are being
+        analysed.
     """
 
     subtitle = (
@@ -383,6 +547,7 @@ def plotBaseFrequencies(
             show,
             titleFontSize,
             axisFontSize,
+            yRange,
         )
     elif sortOn == "max":
         title = title or "Maximum base frequency"
@@ -398,7 +563,7 @@ def plotBaseFrequencies(
             axisFontSize,
         )
     else:
-        assert sortOn == "entropy", "Unknown --sortOn value: %r" % sortOn
+        assert sortOn == "entropy", f"Unknown --sortOn value: {sortOn!r}"
         title = title or "Base frequency entropy"
         result = _plotBaseFrequenciesEntropy(
             significantOffsets,
@@ -482,9 +647,7 @@ def plotCoverageAndSignificantLocations(
     """
     Plot read coverage and the significant locations.
     """
-    fig = plotly.tools.make_subplots(
-        rows=2, cols=1, subplot_titles=("a", "b"), print_grid=False
-    )
+    fig = make_subplots(rows=2, cols=1, subplot_titles=("a", "b"), print_grid=False)
 
     plotCoverage(fig, 1, 1, readCountAtOffset, genomeLength)
 
@@ -497,7 +660,7 @@ def plotCoverageAndSignificantLocations(
             }
         )
 
-    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
 
 
 def plotConsistentComponents(
@@ -508,16 +671,38 @@ def plotConsistentComponents(
     outfile,
     infoFile,
     outputDir,
-    title="xxx",
+    title="Consistent components",
     show=False,
     titleFontSize=12,
     axisFontSize=12,
+    minReadsPerConsistentComponent=2,
 ):
     """
-    Plot consistent connected components.
+    Make a plot of all consistent connected components.
+
+    @param referenceId: The C{str} id of the reference sequence.
+    @param genomeLength: The C{int} length of the genome the reads were
+        aligned to.
+    @param components: A C{list} of C{ComponentByOffsets} instances.
+    @param significantOffsets: A C{set} of signifcant offsets.
+    @param outfile: The C{Path} to a file to write the plot to.
+    @param infofile: The C{Path} to a file to write informative text output to.
+    @param outputDir: The C{Path} to the output directory.
+    @param alignmentFile: The C{str} name of an alignment file.
+    @param title: The C{str} title for the plot.
+    @param titleFontSize: The C{int} title font size.
+    @param axisFontSize: The C{int} axis font size.
+    @param minReadsPerConsistentComponent: The C{int} minimum number of reads
+        that must be in a consistent connected component in order for it to
+        be shown.
     """
 
     def offsetsToLocationsStr(offsets):
+        """
+        Convert a list of zero-based offsets into a 1-based comma-separated string.
+
+        @param offsets: An iterable of C{int} zero-based offsets.
+        """
         return ", ".join(map(lambda i: str(i + 1), sorted(offsets)))
 
     data = []
@@ -546,7 +731,7 @@ def plotConsistentComponents(
 
             # Get the reference sequence for the component.
             reads = list(
-                FastaReads(join(outputDir, "component-%d-consensuses.fasta" % count))
+                FastaReads(outputDir / ("component-%d-consensuses.fasta" % count))
             )
 
             reference = reads[0]
@@ -554,7 +739,12 @@ def plotConsistentComponents(
             minOffset = min(component.offsets)
             maxOffset = max(component.offsets)
 
-            print("  Offset range: %d to %d" % (minOffset + 1, maxOffset + 1), file=fp)
+            print(
+                "  Offset range (inclusive): %d to %d" % (minOffset + 1, maxOffset),
+                file=fp,
+            )
+
+            legendGroup = f"Component {count}"
 
             # Add a top line to represent the reference.
             data.append(
@@ -562,10 +752,19 @@ def plotConsistentComponents(
                     x=(minOffset + 1, maxOffset + 1),
                     y=(1.05, 1.05),
                     hoverinfo="text",
-                    name=("Reference component %s" % count),
+                    name=legendGroup,
+                    legendgroup=legendGroup,
                     text=(
-                        "Reference component %s, %d offsets"
-                        % (count, len(component.offsets))
+                        "Component %d/%d: %d offset%s, %d consistent "
+                        "component%s"
+                        % (
+                            count,
+                            len(components),
+                            len(component.offsets),
+                            s(len(component.offsets)),
+                            len(component.consistentComponents),
+                            s(len(component.consistentComponents)),
+                        )
                     ),
                 )
             )
@@ -578,8 +777,9 @@ def plotConsistentComponents(
                     mode="lines",
                     hoverinfo="none",
                     line={
-                        "color": "#eee",
+                        "color": "#ddd",
                     },
+                    legendgroup=legendGroup,
                     showlegend=False,
                 )
             )
@@ -590,14 +790,22 @@ def plotConsistentComponents(
                     mode="lines",
                     hoverinfo="none",
                     line={
-                        "color": "#eee",
+                        "color": "#ddd",
                     },
+                    legendgroup=legendGroup,
                     showlegend=False,
                 )
             )
 
             for ccCount, cc in enumerate(component.consistentComponents, start=1):
-                ccSummary = "Component read count %d, offsets covered %d/%d" % (
+                if len(cc.reads) < minReadsPerConsistentComponent:
+                    continue
+                ccSummary = (
+                    "Consistent component %d/%d. "
+                    "Read count %d, offsets covered %d/%d"
+                ) % (
+                    ccCount,
+                    len(component.consistentComponents),
                     len(cc.reads),
                     len(cc.nucleotides),
                     len(component.offsets),
@@ -650,14 +858,15 @@ def plotConsistentComponents(
                         x.append(offset + 1)
 
                         text.append(
-                            "Location: %d, component: %s, reference: %s"
-                            "<br>Component nucleotides: %s<br>%s"
+                            "%s<br>"
+                            "Location: %d, component: %s, reference: %s<br>"
+                            "Component nucleotides: %s"
                             % (
+                                ccSummary,
                                 offset + 1,
                                 consensusBase,
                                 referenceBase,
                                 baseCountsToStr(cc.nucleotides[offset]),
-                                ccSummary,
                             )
                         )
 
@@ -668,16 +877,19 @@ def plotConsistentComponents(
                         hoverinfo="text",
                         selectedpoints=identical,
                         showlegend=False,
+                        legendgroup=legendGroup,
                         text=text,
                         mode="markers",
                         selected={
                             "marker": {
-                                "color": "blue",
+                                "color": "green",
+                                "size": 3,
                             }
                         },
                         unselected={
                             "marker": {
                                 "color": "red",
+                                "size": 3,
                             }
                         },
                     )
@@ -687,12 +899,12 @@ def plotConsistentComponents(
     n = len(significantOffsets)
     data.append(
         go.Scatter(
-            x=[i + 1 for i in significantOffsets],
+            x=[offset + 1 for offset in significantOffsets],
             y=[-0.05] * n,
-            text=["Location %d" % (offset + 1) for offset in significantOffsets],
+            text=[f"Significant site {offset + 1}" for offset in significantOffsets],
             hoverinfo="text",
             mode="markers",
-            name="Significant locations",
+            name=f"Significant sites ({n})",
         )
     )
 
@@ -707,6 +919,7 @@ def plotConsistentComponents(
             "titlefont": {
                 "size": axisFontSize,
             },
+            "showgrid": False,
         },
         yaxis={
             "range": (-0.1, 1.1),
@@ -719,4 +932,4 @@ def plotConsistentComponents(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)

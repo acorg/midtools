@@ -133,6 +133,13 @@ def addAnalysisCommandLineOptions(parser):
     addCommonOptions(parser)
 
     parser.add_argument(
+        "--sampleName",
+        metavar="NAME",
+        required=True,
+        help="The name of the sample whose reads are being analysed.",
+    )
+
+    parser.add_argument(
         "--referenceGenome",
         metavar="FILENAME",
         action="append",
@@ -150,7 +157,11 @@ def addAnalysisCommandLineOptions(parser):
         action="append",
         nargs="+",
         required=True,
-        help="The name of a SAM/BAM alignment file (may be repeated).",
+        help=(
+            "The name of a SAM/BAM alignment file with mappings of reads to all "
+            "references (as produced using the --all option when running bowtie2). "
+            "May be repeated."
+        ),
     )
 
     parser.add_argument(

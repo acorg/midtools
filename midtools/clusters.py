@@ -78,35 +78,29 @@ class ReadCluster:
     @staticmethod
     def commonNucleotidesMultiplicativeDistance(a, b):
         """
-        Measure the distance from one cluster to another, as the sum of the
-        multiplied probabilities of nucleotides.
+        Measure the distance from one cluster to another, as 1.0 minus
+        the average similarity across all common offsets.
 
         @param a: A C{ReadCluster} instance.
         @param b: A C{ReadCluster} instance.
-        @raise ZeroDivisionError: if C{a} or C{b} has no offsets (neither of
-            which should be possible in normal operation).
+        @raise ZeroDivisionError: if either C{a} or C{b} have no offsets
+            (neither of which should be possible in normal operation).
         @return: The C{float} [0.0, 1.0] distance between C{a} and C{b}.
         """
-        aNucleotides = a.nucleotides
-        bNucleotides = b.nucleotides
-        commonOffsets = set(aNucleotides) & set(bNucleotides)
+        aNt = a.nucleotides
+        bNt = b.nucleotides
+        commonOffsets = set(aNt) & set(bNt)
 
         if commonOffsets:
-            similarity = sum(
-                # 1.0 - OffsetBases.multiplicativeDistance(
-                #        aNucleotides[offset], bNucleotides[offset])
+            totalSimilarity = sum(
                 1.0
                 - min(
-                    OffsetBases.multiplicativeDistance(
-                        aNucleotides[offset], bNucleotides[offset]
-                    ),
-                    OffsetBases.homogeneousDistance(
-                        aNucleotides[offset], bNucleotides[offset]
-                    ),
+                    OffsetBases.multiplicativeDistance(aNt[offset], bNt[offset]),
+                    OffsetBases.homogeneousDistance(aNt[offset], bNt[offset]),
                 )
                 for offset in commonOffsets
             )
-            return 1.0 - (similarity / len(commonOffsets))
+            return 1.0 - (totalSimilarity / len(commonOffsets))
         else:
             return 1.0
 
@@ -116,14 +110,14 @@ class ReadCluster:
         Measure the distance from one cluster to another.
 
         The distance is 1.0 minus the fraction of common sites that either
-        (a) agree on what the most common nucleotide is a the site or else
+        (a) agree on what the most common nucleotide is at the site or else
         (b) where one cluster has an overwhelming opinion about the most
-        likely nucleotide.
+            likely nucleotide.
 
             In (a), each site in both clusters is examined for its most
             frequent nucleotide set (there may be more than one equally
             frequent nucleotide). If the intersection of the two sets for a
-            site is non-empty, that site counts as matching. E.g. if the
+            site is non-empty, that site counts as matching. E.g., if the
             cluster for one site has 6 x A and 2 x C and the same site in
             the other cluster has 3 x A and 3 x G, the sites agree because
             A is in the most common nucleotides set for each cluster.
@@ -144,21 +138,21 @@ class ReadCluster:
         @return: The C{float} [0.0, 1.0] distance between C{a} and C{b}.
 
         """
-        aNucleotides = a.nucleotides
-        bNucleotides = b.nucleotides
-        commonOffsets = set(aNucleotides) & set(bNucleotides)
+        aNt = a.nucleotides
+        bNt = b.nucleotides
+        commonOffsets = set(aNt) & set(bNt)
 
         if commonOffsets:
             matching = 0
             for offset in commonOffsets:
-                aNucleotidesAtOffset = aNucleotides[offset]
-                bNucleotidesAtOffset = bNucleotides[offset]
-                if aNucleotidesAtOffset.commonest & bNucleotidesAtOffset.commonest:
+                aNtAtOffset = aNt[offset]
+                bNtAtOffset = bNt[offset]
+                if aNtAtOffset.commonest & bNtAtOffset.commonest:
                     # This is case (a) above.
                     matching += 1
                 else:
                     multiple = OffsetBases.highestFrequenciesMultiple(
-                        aNucleotidesAtOffset, bNucleotidesAtOffset
+                        aNtAtOffset, bNtAtOffset
                     )
                     # Sanity: the multiple cannot be None because that
                     # would mean only one nucleotide is present, and that
@@ -175,7 +169,7 @@ class ReadCluster:
 
 class ReadClusters:
     """
-    Maintain clusters of reads.
+    Maintain multiple clusters of reads.
     """
 
     COMMON_OFFSETS_MAX_FRACTION_MIN = 0.9
@@ -209,7 +203,8 @@ class ReadClusters:
         """
         Measure the distance from one cluster to another based on the fraction
         of shared offsets where the commonest nucleotide(s) for the offset
-        has a non-empty intersection. Hard to explain...
+        has a non-empty intersection. Pathetic docstring meta-comment: This is
+        hard to explain :-(
 
         @param a: An C{int} cluster number.
         @param b: An C{int} cluster number.
@@ -316,9 +311,7 @@ class ReadClusters:
                     % (
                         a,
                         len(cluster1.reads),
-                        s(
-                            len(cluster1.reads),
-                        ),
+                        s(len(cluster1.reads)),
                         len(cluster1.nucleotides),
                         s(len(cluster1.nucleotides)),
                     )
@@ -457,7 +450,7 @@ class ReadClusters:
 
     def analyze(self, cutoff, fp=None):
         """
-        Perform the cluster analysis, up to a given distance cut off.
+        Perform the cluster analysis, up to a given distance cut-off.
 
         @param cutoff: The C{float} distance at which clustering will be
             stopped. Clusters at any greater distance will not be merged.
@@ -485,7 +478,7 @@ class ReadClusters:
             if fp:
                 print(self.mergeDescription(a, b, lowestDistance), file=fp)
 
-            # Merge.
+            # Merge the clusters.
             count = next(self._count)
             self.readClusters[a].merge(self.readClusters[b])
             self.readClusters[count] = self.readClusters[a]
@@ -537,8 +530,9 @@ class ReadClusters:
                         break
 
                     a, b = self.distanceCache.pop()
-                    # self.distanceCache.remove(a)
-                    # self.distanceCache.remove(b)
+                    # 2024-03-30 why were the next two lines commented out?
+                    self.distanceCache.remove(a)
+                    self.distanceCache.remove(b)
 
                     print(self.mergeDescription(a, b, lowestDistance), file=fp)
 

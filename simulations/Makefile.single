@@ -1,13 +1,21 @@
-MID_CONSENSUS := $(CC_OUT)/genome-bowtie2/genome-1/reference-consensus.sam
-MID_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(MID_CONSENSUS))
+x:
+	@echo There is no default make target. Try make data or make run.
 
-GREADY_CONSENSUS := $(GREADY_OUT)/genome-bowtie2/genome-1/reference-consensus.sam
-GREADY_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(GREADY_CONSENSUS))
+data: \
+    dirs \
+    genome.fasta \
+    reads.fastq \
+    $(DB_DIR)/genome-db.1.bt2 \
+    $(SAM_DIR)/genome.sam \
+    $(SAM_DIR)/genome.bam
 
-CLUSTER_CONSENSUS := $(CLUSTER_OUT)/genome-bowtie2/genome-1/reference-consensus.sam
-CLUSTER_CONSENSUS_BAM := $(patsubst %.sam, %.bam, $(CLUSTER_CONSENSUS))
+run: cluster
 
-all: $(MID_CONSENSUS) $(GREADY_CONSENSUS) $(CLUSTER_CONSENSUS)
+all: clean data run
+
+dirs:
+	test -d $(DB_DIR) || mkdir $(DB_DIR)
+	test -d $(SAM_DIR) || mkdir $(SAM_DIR)
 
 genome.fasta:
 	echo '>genome-1' > $@
@@ -20,11 +28,11 @@ reads.fastq: genome.fasta
             --sdLength $(SD_LENGTH) \
             --rate $(READ_MUTATION_RATE) < $< > $@
 
-genome-db.1.bt2: genome.fasta
-	bowtie2-build -f --quiet genome.fasta genome-db
+$(DB_DIR)/genome-db.1.bt2: genome.fasta
+	bowtie2-build -f --quiet genome.fasta $(DB_DIR)/genome-db
 
-genome-bowtie2.sam: genome-db.1.bt2 reads.fastq
-	bowtie2 --quiet --local --xeq --all -U reads.fastq -x genome-db -S $@
+$(SAM_DIR)/genome.sam: $(DB_DIR)/genome-db.1.bt2 reads.fastq
+	bowtie2 --quiet --local --xeq --all -U reads.fastq -x $(DB_DIR)/genome-db -S $@
 
 ## Nucleotide frequency
 
@@ -41,50 +49,25 @@ genome-bowtie2.sam: genome-db.1.bt2 reads.fastq
 # coverage.html: genome-bowtie2.sam
 # $(CSL_SCRIPT) --outfile $@ $(CSL_ARGS) --referenceId genome-1 --samfile $<
 
-## Connected components
-
-AGREEMENT_THRESHOLD ?= 0.55
-
-$(MID_CONSENSUS): genome-bowtie2.bam genome.fasta
-	$(BIN)/connected-components.py \
-            --alignmentFile genome-bowtie2.bam \
-            --outputDir $(CC_OUT) \
-            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
-            --minReads $(MIN_READS) \
-            --agreementThreshold $(AGREEMENT_THRESHOLD) \
-            --referenceGenome genome.fasta \
-            --plotSAM \
-            --verbose 1 > cc.stdout
-	ln -s $(CC_OUT)/genome-bowtie2/genome-1/reads.html
-	ln -s $(CC_OUT)/genome-bowtie2/genome-1/component-1-consensuses-identity.html
-	ln -s $(CC_OUT)/genome-bowtie2/genome-1/consistent-components-plot.html
-	ln -s $(CC_OUT)/genome-bowtie2/genome-1/coverage-and-significant-offsets.html
-	ln -s $(CC_OUT)/genome-bowtie2/genome-1/reference-base-frequencies.html
-
-$(GREADY_CONSENSUS): genome-bowtie2.bam genome.fasta
-	$(BIN)/gready.py \
-            --alignmentFile genome-bowtie2.bam \
-            --outputDir $(GREADY_OUT) \
-            --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
-            --minReads $(MIN_READS) \
-            --referenceGenome genome.fasta \
-            --plotSAM \
-            --verbose 1 > gready.stdout
-	ln -s $(GREADY_OUT)/genome-bowtie2/genome-1/reads.html
-	ln -s $(GREADY_OUT)/genome-bowtie2/genome-1/coverage-and-significant-offsets.html
-	ln -s $(GREADY_OUT)/genome-bowtie2/genome-1/reference-base-frequencies.html
-
-$(CLUSTER_CONSENSUS): genome-bowtie2.bam genome.fasta
+cluster: dirs $(SAM_DIR)/genome.bam genome.fasta
 	$(BIN)/cluster.py \
-            --alignmentFile genome-bowtie2.bam \
-            --outputDir $(CLUSTER_OUT) \
+            --sampleName simulated-sample \
+            --alignmentFile $(SAM_DIR)/genome.bam \
+            --outputDir $(OUT) \
             --homogeneousCutoff $(HOMOGENEOUS_CUTOFF) \
+            --verbose 1 \
             --minReads $(MIN_READS) \
-            --cutoff $(CLUSTER_DISTANCE_CUTOFF) \
+            --maxClusterDist $(CLUSTER_DISTANCE_CUTOFF) \
             --referenceGenome genome.fasta \
             --plotSAM \
-            --verbose 1 > cluster.stdout
+            --alternateNucleotideMinFreq $(ALTERNATE_NUCLEOTIDE_MIN_FREQ)
+
+all-reads-plot:
+	plot-reads-against-all-references.py \
+            --sampleName simulated-sample \
+            --samFile $(SAM_DIR)/genome.bam \
+	    --outputFile $(OUT)/reads-against-all-references.html
 
 clean:
-	rm -f *~ genome-db* genome-bowtie2* *.fastq *.fasta *.html *.stdout
-	rm -fr $(CC_OUT) $(GREADY_OUT)
+	rm -f *~ genome.fasta reads.fastq
+	rm -fr $(DB_DIR) $(SAM_DIR) $(OUT)

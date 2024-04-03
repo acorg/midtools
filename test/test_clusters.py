@@ -252,10 +252,13 @@ class TestReadCluster(TestCase):
             0.0, ReadCluster.commonNucleotidesMultiplicativeDistance(rc1, rc2)
         )
 
-    def testMultiplicativeDistanceOneHalf(self):
+    def testMultiplicativeDistanceOneQuarter(self):
         """
-        The commonNucleotidesMultiplicativeDistance method must return 0.5
-        when the ratio of two bases in one cluster is 50:50.
+        The commonNucleotidesMultiplicativeDistance method must return 0.25
+        when the ratio of two bases in one cluster is 50:50. You need to look
+        at that method to see what's going on. It's more complicated than it
+        used to be because it uses a min of a multiplicative distance and a
+        homogeneous one.
         """
         read1 = AlignedRead("id1", "---TCTC-")
         read1.setSignificantOffsets([3, 4, 5, 6])
@@ -268,7 +271,7 @@ class TestReadCluster(TestCase):
         rc2.add(read2)
 
         self.assertAlmostEqual(
-            0.5, ReadCluster.commonNucleotidesMultiplicativeDistance(rc1, rc2)
+            0.25, ReadCluster.commonNucleotidesMultiplicativeDistance(rc1, rc2)
         )
 
 
@@ -314,7 +317,7 @@ class TestReadClusters(TestCase):
 
         self.assertAlmostEqual(1.0, rc.multiplicativeDistance(cluster1, cluster2))
 
-    def testMultiplicativeDistanceOneQuarter(self):
+    def testMultiplicativeDistanceOneTenth(self):
         """
         The multiplicative distance between two clusters must be 0.1 when
         they are identical and the minimum fraction of common offsets
@@ -325,6 +328,9 @@ class TestReadClusters(TestCase):
         ReadClusters.COMMON_OFFSETS_MAX_FRACTION_MIN so it it used to scale
         the commonNucleotidesAgreementDistance distance.
         """
+        # Check that the above comment is possibly correct :-)
+        self.assertEqual(ReadClusters.COMMON_OFFSETS_MAX_FRACTION_MIN, 0.9)
+
         read1 = AlignedRead("id1", "-----CCGT")
         read1.setSignificantOffsets([5, 6, 7, 8])
 
@@ -337,7 +343,7 @@ class TestReadClusters(TestCase):
 
         self.assertAlmostEqual(0.1, rc.multiplicativeDistance(cluster1, cluster2))
 
-    def testMultiplicativeDistanceOneQuarterLowOffsetCoverage(self):
+    def testMultiplicativeDistanceOneTenthLowOffsetCoverage(self):
         """
         The multiplicative distance between two clusters must be 0.1 when
         they are identical but the maximum fraction of common offsets is
@@ -357,14 +363,9 @@ class TestReadClusters(TestCase):
 
         self.assertAlmostEqual(0.1, rc.multiplicativeDistance(cluster1, cluster2))
 
-    def testMultiplicativeDistanceThreeQuartersLowOffsetCoverage(self):
+    def testMultiplicativeDistanceTwoOffsetsInCommonOneAgreesOneDoesNot(self):
         """
-        The multiplicative distance between two clusters must be 0.55 when
-        they agree 50% and the maximum fraction of common offsets is
-        0.5 (in which case the 0.9 minimum offset coverage fraction
-        will be applied as described in the
-        testMultiplicativeDistanceOneQuarter test above) because
-        1.0 - (0.5 * max(0.9, 0.5)) = 0.55).
+        The explanation for the numeric result here can only be seen by 
         """
         read1 = AlignedRead("id1", "-----CAGT")
         read1.setSignificantOffsets([5, 6, 7, 8])
@@ -376,7 +377,9 @@ class TestReadClusters(TestCase):
         cluster1 = rc.add(read1)
         cluster2 = rc.add(read2)
 
-        self.assertAlmostEqual(0.55, rc.multiplicativeDistance(cluster1, cluster2))
+        self.assertAlmostEqual(
+            1.0 - ((1.0 - 0.25) * 0.9), rc.multiplicativeDistance(cluster1, cluster2)
+        )
 
     def testMultiplicativeDistanceZero(self):
         """

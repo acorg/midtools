@@ -1,4 +1,3 @@
-############################## Rules
 %.bam : %.sam
 	samtools view -b < $< | samtools sort - > $@
 	samtools index $@
@@ -9,15 +8,20 @@
 %.fasta: %.fastq
 	filter-fasta.py --quiet --fastq --saveAs fasta < $< > $@
 
-BIN ?= ../../bin
+BIN = ../../bin
 
-CC_OUT ?= cc.out
-GREADY_OUT ?= gready.out
-CLUSTER_OUT ?= cluster.out
-
+# For simulation data.
 GENOME_LENGTH ?= 1000
-HOMOGENEOUS_CUTOFF ?= 0.95
-CLUSTER_DISTANCE_CUTOFF ?= 0.25
 MEAN_LENGTH ?= 100
 SD_LENGTH ?= 18
 MIN_READS ?= 5
+
+# For cluster.
+HOMOGENEOUS_CUTOFF ?= 0.95
+ALTERNATE_NUCLEOTIDE_MIN_FREQ ?= 0.05
+MIN_READS ?= 2
+CLUSTER_DISTANCE_CUTOFF ?= 0.20
+
+OUT := OUT
+DB_DIR := bowtie2-db
+SAM_DIR := bowtie2-sam

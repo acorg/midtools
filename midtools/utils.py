@@ -124,6 +124,16 @@ def s(count):
     return "" if count == 1 else "s"
 
 
+def quoted(filename):
+    """
+    Return a single-quoted string for a filename.
+
+    @param filename: A C{Path} instance (actually this can be anything).
+    @return: A quoted C{str} of the path to the file.
+    """
+    return f"{str(filename)!r}"
+
+
 def commas(iterable):
     """
     Turn an iterable into a sorted comma-separated string.

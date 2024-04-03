@@ -90,7 +90,8 @@ class OffsetBases:
     def multiplicativeDistance(a, b):
         """
         Measure the multiplicative distance from one set of offsets to another,
-        as the sum of the multiplied probabilities of nucleotides.
+        as 1.0 minus the sum of the multiplied probabilities of their common
+        nucleotides.
 
         @param a: An C{OffsetBases} instance.
         @param b: An C{OffsetBases} instance.
@@ -100,12 +101,13 @@ class OffsetBases:
         """
         aCounts = a._counts
         bCounts = b._counts
-        s1 = sum(aCounts.values())
-        s2 = sum(bCounts.values())
-        # Let a ZeroDivisionError occur if s1 or s2 is zero.
+        aTotal = sum(aCounts.values())
+        bTotal = sum(bCounts.values())
+        commonBases = set(aCounts) & set(bCounts)
+
+        # Let a ZeroDivisionError occur if aTotal or bTotal is zero.
         return 1.0 - sum(
-            (aCounts[base] / s1) * (bCounts[base] / s2)
-            for base in set(list(aCounts) + list(bCounts))
+            (aCounts[base] / aTotal) * (bCounts[base] / bTotal) for base in commonBases
         )
 
     @staticmethod
@@ -123,10 +125,11 @@ class OffsetBases:
         aCounts = a._counts
         bCounts = b._counts
         denom = sum(aCounts.values()) + sum(bCounts.values())
+        allBases = set(aCounts) | set(bCounts)
+
         # Let a ZeroDivisionError occur if denom is zero.
         return 1.0 - max(
-            (aCounts[base] + bCounts[base]) / denom
-            for base in set(list(aCounts) + list(bCounts))
+            ((aCounts[base] + bCounts[base]) / denom) for base in allBases
         )
 
     @staticmethod
