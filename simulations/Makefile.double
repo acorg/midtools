@@ -125,7 +125,7 @@ reads-2-genome-2-coverage-and-significant-locations.html: $(SAM_DIR)/reads-2-gen
 
 
 cluster: dirs $(SAM_DIR)/reads-12-genome-12-all.bam genome-12.fasta
-	$(BIN)/cluster.py \
+	$(BIN)/mid-cluster.py \
             --sampleName simulated-sample \
             --alignmentFile $(SAM_DIR)/reads-12-genome-12-all.bam \
             --outputDir $(OUT) \

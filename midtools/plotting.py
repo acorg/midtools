@@ -153,10 +153,10 @@ def plotAllReferencesSAM(
         genotype = referenceGenotype[referenceId]
         genotypeCount[genotype] += 1
         genotypeReferences[genotype].add(referenceId)
-        text = f"{referenceId} Read: {alignment.query_name}"
+        text = f"{referenceId} Match {start + 1}-{end}, Read: {alignment.query_name}"
         data.append(
             go.Scatter(
-                x=(start * scaleFactor, end * scaleFactor),
+                x=((start + 1) * scaleFactor, end * scaleFactor),
                 y=(score, score),
                 text=(text, text),
                 hoverinfo="text",
@@ -186,9 +186,12 @@ def plotAllReferencesSAM(
 
     if hbv:
         genotypeReferencesDesc = (
-            "Genotypes: "
+            " Genotypes: "
             + "; ".join(
-                (f"{gt}: " + ", ".join(sorted(genotypeReferences[gt], key=sampleIdKey)))
+                (
+                    f"<b>{gt}</b>: "
+                    + ", ".join(sorted(genotypeReferences[gt], key=sampleIdKey))
+                )
                 for gt in genotypes
                 if genotypeCount[gt]
             )
@@ -198,13 +201,10 @@ def plotAllReferencesSAM(
     else:
         genotypeReferencesDesc = sampleGenotypeDesc = ""
 
-    jitterDesc = "" if jitter == 0.0 else f" y-jitter: {jitter:.2f}"
-
     title = "<br>".join(
         wrap(
             f"Best-matched genotypes for {count} reads for {sampleName} "
-            f"{sampleGenotypeDesc}from {alignmentFile}. "
-            f"{genotypeReferencesDesc}{jitterDesc}",
+            f"{sampleGenotypeDesc}from {alignmentFile}.{genotypeReferencesDesc}",
             width=120,
         )
     )
@@ -435,6 +435,85 @@ def _plotBaseFrequenciesEntropy(
     return entropyInfo
 
 
+def _plotBaseFrequenciesAllOffsets(
+    genomeLength,
+    significantOffsets,
+    baseCountAtOffset,
+    readCountAtOffset,
+    outfile,
+    title,
+    show,
+    titleFontSize,
+    axisFontSize,
+    yRange,
+):
+    """
+    Plot the (sorted) base frequencies for each of the significant offsets.
+    """
+
+    # This function is currently unused. It plots all offsets, but the data become
+    # invisible when there are under 350 significant offsets, so it's pretty useless
+    # (you have to zoom to see any data).
+    x = list(range(genomeLength))
+    text = []
+    freqs = [], [], [], []
+
+    for offset in range(genomeLength):
+        if offset in significantOffsets:
+            count = readCountAtOffset[offset]
+
+            sortedFreqs = [
+                x / count
+                for x in sorted(baseCountAtOffset[offset].values(), reverse=True)
+            ]
+            while len(sortedFreqs) < 4:
+                sortedFreqs.append(0.0)
+
+            for i, frequency in enumerate(sortedFreqs):
+                freqs[i].append(frequency)
+
+            text.append(
+                ("site %d<br>" % (offset + 1))
+                + ", ".join(
+                    "%s: %d" % (k, v) for k, v in baseCountAtOffset[offset].items()
+                )
+            )
+        else:
+            for i in 0, 1, 2, 3:
+                freqs[i].append(0.0)
+            text.append("")
+
+    data = [
+        go.Bar(x=x, y=freqs[0], showlegend=False, text=text),
+        go.Bar(x=x, y=freqs[1], showlegend=False),
+        go.Bar(x=x, y=freqs[2], showlegend=False),
+        go.Bar(x=x, y=freqs[3], showlegend=False),
+    ]
+    layout = go.Layout(
+        barmode="stack",
+        title=title,
+        titlefont={
+            "size": titleFontSize,
+        },
+        xaxis={
+            "title": "Significant site index",
+            "titlefont": {
+                "size": axisFontSize,
+            },
+        },
+        yaxis={
+            "title": "Nucleotide frequency",
+            "range": yRange,
+            "titlefont": {
+                "size": axisFontSize,
+            },
+        },
+    )
+
+    fig = go.Figure(data=data, layout=layout)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+
+
 def _plotBaseFrequencies(
     significantOffsets,
     baseCountAtOffset,
@@ -451,12 +530,7 @@ def _plotBaseFrequencies(
     """
     x = list(range(len(significantOffsets)))
     text = []
-    freqs = (
-        [],
-        [],
-        [],
-        [],
-    )
+    freqs = [], [], [], []
 
     for offset in significantOffsets:
         count = readCountAtOffset[offset]
@@ -507,6 +581,7 @@ def _plotBaseFrequencies(
 
 
 def plotBaseFrequencies(
+    genomeLength,
     significantOffsets,
     baseCountAtOffset,
     readCountAtOffset,
@@ -746,6 +821,10 @@ def plotConsistentComponents(
 
             legendGroup = f"Component {count}"
 
+            componentTotalReads = sum(
+                len(cc.reads) for cc in component.consistentComponents
+            )
+
             # Add a top line to represent the reference.
             data.append(
                 go.Scatter(
@@ -755,13 +834,14 @@ def plotConsistentComponents(
                     name=legendGroup,
                     legendgroup=legendGroup,
                     text=(
-                        "Component %d/%d: %d offset%s, %d consistent "
+                        "Component %d/%d: %d offset%s, %d reads, %d consistent "
                         "component%s"
                         % (
                             count,
                             len(components),
                             len(component.offsets),
                             s(len(component.offsets)),
+                            componentTotalReads,
                             len(component.consistentComponents),
                             s(len(component.consistentComponents)),
                         )

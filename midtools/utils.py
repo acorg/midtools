@@ -43,7 +43,7 @@ def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
 
     @param counts: Either a C{Counter} or an C{OffsetBases} instance.
     @param drawBreaker: The nucleotide base to use if there is a draw (and
-        the C{drawBreaker} nucleotide is one of the drawing best nucleotides.
+        the C{drawBreaker} nucleotide is one of the nucleotides involved in the draw.
     @param drawFp: A file pointer to write information about draws (if any) to.
     @param drawMessage: A C{str} message to write to C{drawFp}. If the string
         contains '%(baseCounts)s' that will be replaced by a string
@@ -61,15 +61,12 @@ def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
         orderedCounts = counts._counts.most_common()
 
     maxCount = orderedCounts[0][1]
-    best = [x for x in orderedCounts if x[1] == maxCount]
+    best = set(x[0] for x in orderedCounts if x[1] == maxCount)
 
     if len(best) > 1:
         # There's a draw. Return the drawbreaker nucleotide if it's among
         # the best, else just return the first one given by most_common.
-        if any(x[0] == drawBreaker for x in best):
-            base = drawBreaker
-        else:
-            base = orderedCounts[0][0]
+        base = drawBreaker if drawBreaker in best else orderedCounts[0][0]
 
         if drawFp:
             # Check we also have a draw-break message.

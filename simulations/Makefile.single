@@ -9,7 +9,7 @@ data: \
     $(SAM_DIR)/genome.sam \
     $(SAM_DIR)/genome.bam
 
-run: cluster
+run: cluster all-reads-plot
 
 all: clean data run
 
@@ -50,7 +50,7 @@ $(SAM_DIR)/genome.sam: $(DB_DIR)/genome-db.1.bt2 reads.fastq
 # $(CSL_SCRIPT) --outfile $@ $(CSL_ARGS) --referenceId genome-1 --samfile $<
 
 cluster: dirs $(SAM_DIR)/genome.bam genome.fasta
-	$(BIN)/cluster.py \
+	$(BIN)/mid-cluster.py \
             --sampleName simulated-sample \
             --alignmentFile $(SAM_DIR)/genome.bam \
             --outputDir $(OUT) \

@@ -12,6 +12,9 @@ from dark.process import Executor
 from dark.reads import Reads
 from dark.sam import SAMFilter, PaddedSAM, samfile
 
+# This relies on our HBV repo.
+from pyhbv.genotype import getGenotype
+
 from midtools.data import gatherData, findSignificantOffsets
 from midtools.match import matchToString
 from midtools.plotting import (
@@ -52,10 +55,6 @@ class ReadAnalysis:
         adding reads to a component.
     @param plotSAM: If C{True} save plots of where reads lie on each reference
         genome (can be slow).
-    @param plotAllReferencesSAM: If C{True}, save a plot showing where reads are
-        aligned to on the genome along with their alignment scores. This will
-        show all reads as they are aligned to (possibly unequal-length)
-        references (can be slow).
     @param saveReducedFASTA: If C{True}, write out a FASTA file of the original
         input but with just the signifcant locations.
     @param verbose: The C{int}, verbosity level. Use C{0} for no output.
@@ -74,7 +73,6 @@ class ReadAnalysis:
         minReads=DEFAULT_MIN_READS,
         homogeneousCutoff=DEFAULT_HOMOGENEOUS_CUTOFF,
         plotSAM=False,
-        plotAllReferencesSAM=False,
         saveReducedFASTA=False,
         verbose=0,
     ):
@@ -84,7 +82,6 @@ class ReadAnalysis:
         self.minReads = minReads
         self.homogeneousCutoff = homogeneousCutoff
         self.plotSAM = plotSAM
-        self.plotAllReferencesSAM = plotAllReferencesSAM
         self.saveReducedFASTA = saveReducedFASTA
         self.verbose = verbose
         self.referenceGenomes = self._readReferenceGenomes(referenceGenomeFiles)
@@ -195,8 +192,11 @@ class ReadAnalysis:
 
             self._writeAlignmentFileSummary(alignmentFile, alignmentOutputDir)
 
-            for referenceId in sorted(self.referenceIds):
-                self.report("  Looking for reference", referenceId)
+            for count, referenceId in enumerate(sorted(self.referenceIds), start=1):
+                self.report(
+                    f"  Looking for reference {referenceId} "
+                    f"({count}/{len(self.referenceIds)})."
+                )
 
                 referenceOutputDir = self._setupReferenceOutputDir(
                     referenceId, alignmentOutputDir
@@ -230,7 +230,7 @@ class ReadAnalysis:
             'consensusRead', the consensus sequence that best matches
             C{referenceId}.
         """
-        raise NotImplementedError("Subclasses must implement this method")
+        raise NotImplementedError("Subclasses must implement this method.")
 
     def _writeAlignmentFileSummary(self, alignmentFile, outputDir):
         """
@@ -415,9 +415,10 @@ class ReadAnalysis:
                     resultSummary.append(
                         (
                             fraction,
-                            "  %s: %d/%d (%.2f%%)"
+                            "  %s (%s): %d/%d (%.2f%%)"
                             % (
                                 referenceId,
+                                getGenotype(referenceId),
                                 matchCount,
                                 len(referenceRead),
                                 fraction * 100.0,
@@ -465,7 +466,7 @@ class ReadAnalysis:
             tid = sam.get_tid(referenceId)
             if tid == -1:
                 # This referenceId is not in this alignment file.
-                self.report("    Reference %s not in alignment file." % referenceId)
+                self.report(f"    Reference {referenceId} not in alignment file.")
                 return
             else:
                 genomeLength = sam.lengths[tid]
@@ -474,7 +475,7 @@ class ReadAnalysis:
 
         if self.plotSAM:
             filename = outputDir / "reads.html"
-            self.report("    Saving reads alignment plot to %s" % filename)
+            self.report(f"    Saving reads alignment plot to {str(filename)!r}")
             plotSAM(
                 SAMFilter(alignmentFile, referenceIds={referenceId}),
                 filename,
@@ -909,6 +910,7 @@ class ReadAnalysis:
         filename = outputDir / "reference-base-frequencies.html"
         self.report("    Writing reference base frequency plot to", filename)
         plotBaseFrequencies(
+            genomeLength,
             significantOffsets,
             baseCountAtOffset,
             readCountAtOffset,
