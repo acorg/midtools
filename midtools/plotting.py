@@ -739,13 +739,10 @@ def plotCoverageAndSignificantLocations(
 
 
 def plotConsistentComponents(
-    referenceId,
-    genomeLength,
+    reference,
     components,
-    significantOffsets,
     outfile,
     infoFile,
-    outputDir,
     title="Consistent components",
     show=False,
     titleFontSize=12,
@@ -755,15 +752,10 @@ def plotConsistentComponents(
     """
     Make a plot of all consistent connected components.
 
-    @param referenceId: The C{str} id of the reference sequence.
-    @param genomeLength: The C{int} length of the genome the reads were
-        aligned to.
+    @param reference: A C{Reference} instance.
     @param components: A C{list} of C{ComponentByOffsets} instances.
-    @param significantOffsets: A C{set} of signifcant offsets.
     @param outfile: The C{Path} to a file to write the plot to.
     @param infofile: The C{Path} to a file to write informative text output to.
-    @param outputDir: The C{Path} to the output directory.
-    @param alignmentFile: The C{str} name of an alignment file.
     @param title: The C{str} title for the plot.
     @param titleFontSize: The C{int} title font size.
     @param axisFontSize: The C{int} axis font size.
@@ -786,9 +778,9 @@ def plotConsistentComponents(
         print(
             "There are %d significant location%s: %s"
             % (
-                len(significantOffsets),
-                s(len(significantOffsets)),
-                offsetsToLocationsStr(significantOffsets),
+                len(reference.significantOffsets),
+                s(len(reference.significantOffsets)),
+                offsetsToLocationsStr(reference.significantOffsets),
             ),
             file=fp,
         )
@@ -806,11 +798,13 @@ def plotConsistentComponents(
 
             # Get the reference sequence for the component.
             reads = list(
-                FastaReads(outputDir / ("component-%d-consensuses.fasta" % count))
+                FastaReads(
+                    reference.outputDir / ("component-%d-consensuses.fasta" % count)
+                )
             )
 
-            reference = reads[0]
-            length = len(reference)
+            componentReferenceRead = reads[0]
+            length = len(componentReferenceRead)
             minOffset = min(component.offsets)
             maxOffset = max(component.offsets)
 
@@ -907,9 +901,12 @@ def plotConsistentComponents(
                     file=fp,
                 )
 
-                match = compareDNAReads(reference, consensus)
+                match = compareDNAReads(componentReferenceRead, consensus)
                 print(
-                    matchToString(match, reference, consensus, indent="    "), file=fp
+                    matchToString(
+                        match, componentReferenceRead, consensus, indent="    "
+                    ),
+                    file=fp,
                 )
 
                 identicalMatchCount = match["match"]["identicalMatchCount"]
@@ -929,7 +926,7 @@ def plotConsistentComponents(
                 for index, offset in enumerate(sorted(component.offsets)):
                     if offset in cc.nucleotides:
                         consensusBase = consensus.sequence[index]
-                        referenceBase = reference.sequence[index]
+                        referenceBase = componentReferenceRead.sequence[index]
 
                         if consensusBase == referenceBase:
                             identical.append(len(x))
@@ -976,12 +973,15 @@ def plotConsistentComponents(
                 )
 
     # Add the significant offsets.
-    n = len(significantOffsets)
+    n = len(reference.significantOffsets)
     data.append(
         go.Scatter(
-            x=[offset + 1 for offset in significantOffsets],
+            x=[offset + 1 for offset in reference.significantOffsets],
             y=[-0.05] * n,
-            text=[f"Significant site {offset + 1}" for offset in significantOffsets],
+            text=[
+                f"Significant site {offset + 1}"
+                for offset in reference.significantOffsets
+            ],
             hoverinfo="text",
             mode="markers",
             name=f"Significant sites ({n})",
@@ -994,7 +994,7 @@ def plotConsistentComponents(
             "size": titleFontSize,
         },
         xaxis={
-            "range": (0, genomeLength + 1),
+            "range": (0, len(reference.read) + 1),
             "title": "Genome location",
             "titlefont": {
                 "size": axisFontSize,
