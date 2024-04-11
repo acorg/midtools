@@ -9,7 +9,7 @@ from dark.fasta import FastaReads
 from dark.sam import samfile
 
 from midtools.analysis import ReadAnalysis
-from midtools.data import gatherData, findSignificantOffsets
+from midtools.offsets import analyzeOffets, findSignificantOffsets
 from midtools.match import matchToString
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.utils import (
@@ -864,7 +864,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                 consensusReadCountAtOffset,
                 consensusWantedReadsBaseCountAtOffset,
                 _,
-            ) = gatherData(genomeLength, set(alignedReads) - unwantedCcReads)
+            ) = analyzeOffets(genomeLength, set(alignedReads) - unwantedCcReads)
 
             depthFile = join(outputDir, "consensus-depth.txt")
             self.report("    Writing consensus depth information to", depthFile)
@@ -1313,7 +1313,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             # aligned reads minus the reads we don't want because they're
             # in a consistent component that is not the best for this
             # non-reference sequence.
-            consensusReadCountAtOffset, wantedReadBaseCountAtOffset, _ = gatherData(
+            consensusReadCountAtOffset, wantedReadBaseCountAtOffset, _ = analyzeOffets(
                 genomeLength, set(alignedReads) - unwantedCcReads
             )
 

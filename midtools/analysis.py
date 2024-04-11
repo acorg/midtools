@@ -11,12 +11,13 @@ from dark.fasta import FastaReads
 from dark.process import Executor
 from dark.reads import Reads
 from dark.sam import SAMFilter, PaddedSAM, samfile
+from dark.utils import pct
 
 # This relies on our HBV repo.
 from pyhbv.genotype import getGenotype
 
-from midtools.data import gatherData, findSignificantOffsets
 from midtools.match import matchToString
+from midtools.offsets import analyzeOffets, findSignificantOffsets
 from midtools.plotting import (
     plotBaseFrequencies,
     plotCoverageAndSignificantLocations,
@@ -111,9 +112,9 @@ class ReadAnalysis:
         @return: A C{set} of C{str} reference ids to process.
         """
         if referenceIds:
-            # Specific reference ids were given. Check that each appears in
-            # some alignment file and that we have a genome for each. Any
-            # error here causes a message to stderr and exit.
+            # Specific reference ids were given. Check that each appears in some
+            # alignment file and that we have a genome for each. Any error here causes a
+            # message to stderr and exit.
             missing = set(referenceIds) - alignedReferences
             if missing:
                 print(
@@ -136,11 +137,10 @@ class ReadAnalysis:
                 )
                 sys.exit(1)
         else:
-            # We weren't told which reference ids to specifically examine
-            # the alignments of, so examine all available references
-            # mentioned in any alignment file and that we also have a
-            # genome for. Mention any references from alignment files that
-            # we can't process due to lack of a genome.
+            # We weren't told which reference ids to specifically examine the alignments
+            # of, so examine all available references mentioned in any alignment file
+            # and that we also have a genome for. Mention any references from alignment
+            # files that we can't process due to lack of a genome.
             missing = alignedReferences - set(self.referenceGenomes)
             if missing:
                 self.report(
@@ -259,6 +259,7 @@ class ReadAnalysis:
            with values being C{dict}s with signifcant offsets and best
            consensus sequence for the corresponding reference in the alignment
            file.
+        @param outputDir: The C{Path} to the output directory.
         """
         referencesFilename = outputDir / "references.fasta"
         self.report("  Writing FASTA for mapped-to references to", referencesFilename)
@@ -303,6 +304,7 @@ class ReadAnalysis:
            file name, then C{str} short reference name, and with values being
            C{dict}s with signifcant offsets and best consensus sequence for
            the corresponding reference in the alignment file.
+        @param outputDir: The C{Path} to the output directory.
         """
         filename = outputDir / "result-summary.txt"
         self.report("Writing overall result summary to", filename)
@@ -385,12 +387,10 @@ class ReadAnalysis:
            file name, then C{str} short reference name, and with values being
            C{dict}s with signifcant offsets and best consensus sequence for
            the corresponding reference in the alignment file.
+        @param outputDir: The C{Path} to the output directory.
         """
         filename = outputDir / "result-summary-summary.txt"
         self.report("Writing overall result summary summary to", filename)
-
-        bestFraction = 0.0
-        bestAlignmentReference = []
 
         with open(filename, "w") as fp:
             for alignmentFilename in sorted(results):
@@ -401,49 +401,29 @@ class ReadAnalysis:
                     referenceRead = self.referenceGenomes[referenceId]
                     consensusRead = result["consensusRead"]
                     match = compareDNAReads(referenceRead, consensusRead)["match"]
-                    matchCount = (
-                        match["identicalMatchCount"] + match["ambiguousMatchCount"]
-                    )
-                    fraction = matchCount / len(referenceRead)
-
-                    if fraction > bestFraction:
-                        bestFraction = fraction
-                        bestAlignmentReference = [(alignmentFilename, referenceId)]
-                    elif fraction == bestFraction:
-                        bestAlignmentReference.append((alignmentFilename, referenceId))
-
+                    strictCount = match["identicalMatchCount"]
+                    nonStrictCount = strictCount + match["ambiguousMatchCount"]
                     resultSummary.append(
                         (
-                            fraction,
-                            "  %s (%s): %d/%d (%.2f%%)"
+                            strictCount,
+                            nonStrictCount,
+                            "  %-20s\t%-10s\tStrict: %s\tNon-strict: %s"
                             % (
                                 referenceId,
                                 getGenotype(referenceId),
-                                matchCount,
-                                len(referenceRead),
-                                fraction * 100.0,
+                                pct(strictCount, len(referenceRead)),
+                                pct(nonStrictCount, len(referenceRead)),
                             ),
                         )
                     )
 
                 # Sort the result summary by decreasing nucleotide identity
-                # fraction.
+                # fraction. The strict count is first in the tuples we're sorting.
                 resultSummary.sort(reverse=True)
-                for fraction, summary in resultSummary:
+                for _, _, summary in resultSummary:
                     print(summary, file=fp)
 
                 print(file=fp)
-
-            print(
-                "Best match%s (%.2f%%):"
-                % (
-                    "" if len(bestAlignmentReference) == 1 else "es",
-                    bestFraction * 100.0,
-                ),
-                file=fp,
-            )
-            for alignmentFilename, referenceId in bestAlignmentReference:
-                print(f"  {str(alignmentFilename)}: {referenceId}", file=fp)
 
     def initialReferenceIdAnalysis(self, referenceId, alignmentFile, outputDir):
         """
@@ -466,7 +446,7 @@ class ReadAnalysis:
             tid = sam.get_tid(referenceId)
             if tid == -1:
                 # This referenceId is not in this alignment file.
-                self.report(f"    Reference {referenceId} not in alignment file.")
+                self.report(f"    Reference {referenceId!r} not in alignment file.")
                 return
             else:
                 genomeLength = sam.lengths[tid]
@@ -483,16 +463,16 @@ class ReadAnalysis:
                 jitter=0.45,
             )
 
-        alignedReads = []
         samFilter = SAMFilter(
             alignmentFile,
             referenceIds={referenceId},
             dropDuplicates=True,
             dropSupplementary=True,
-            # dropSecondary=True,
             storeQueryIds=True,
         )
         paddedSAM = PaddedSAM(samFilter)
+
+        alignedReads = []
         for query in paddedSAM.queries(addAlignment=True):
             assert len(query) == genomeLength
             alignedReads.append(AlignedRead(query.id, query.sequence, query.alignment))
@@ -502,7 +482,7 @@ class ReadAnalysis:
         # /3 etc to queries that have more than one alignment.
         assert len(alignedReads) == len(set(read.id for read in alignedReads))
 
-        readCountAtOffset, baseCountAtOffset, readsAtOffset = gatherData(
+        readCountAtOffset, baseCountAtOffset, readsAtOffset = analyzeOffets(
             genomeLength, alignedReads
         )
 
@@ -516,7 +496,7 @@ class ReadAnalysis:
         )
 
         self.report(
-            "    %d alignment%s (of %d unique %s) read from %s"
+            "    %d alignment%s (of %d unique %s) read from %r."
             % (
                 samFilter.alignmentCount,
                 s(samFilter.alignmentCount),
@@ -534,6 +514,10 @@ class ReadAnalysis:
             )
         )
         self.report("    Reference genome length %d" % genomeLength)
+
+        coveredOffsetCount = sum(bool(counts) for counts in baseCountAtOffset)
+        self.report(f"    Covered offsets {pct(coveredOffsetCount, genomeLength)}")
+
         self.report(
             "    Found %d significant location%s"
             % (len(significantOffsets), s(len(significantOffsets)))

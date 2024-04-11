@@ -40,6 +40,15 @@ class ReadCluster:
         for offset, base in read.significantOffsets.items():
             nucleotides[offset].incorporateBase(base)
 
+    def update(self, reads):
+        """
+        Add reads to this cluster.
+
+        @param reads: An iterable of C{alignedRead} instances.
+        """
+        for read in reads:
+            self.add(read)
+
     def merge(self, other):
         """
         Merge another cluster into this one.
@@ -52,6 +61,17 @@ class ReadCluster:
 
         for offset, offsetBases in other.nucleotides.items():
             self.nucleotides[offset].merge(offsetBases)
+
+    @property
+    def offsets(self):
+        """
+        Get the set of significant offsets covered by the reads in this component.
+
+        @return: A C{set} of C{int} site offsets.
+        """
+        # This is a property to match the one in the Component class in
+        # clusterAnalysis.py
+        return set(self.nucleotides)
 
     @staticmethod
     def commonOffsetsMaxFraction(a, b):

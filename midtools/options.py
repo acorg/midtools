@@ -1,6 +1,6 @@
 from dark.sam import SAMFilter, PaddedSAM
 
-from midtools.data import gatherData, findSignificantOffsets
+from midtools.offsets import analyzeOffets, findSignificantOffsets
 from midtools.read import AlignedRead
 
 
@@ -96,7 +96,7 @@ def parseCommandLineOptions(args, returnSignificantOffsets=True):
     for query in paddedSAM.queries():
         alignedReads.append(AlignedRead(query.id, query.sequence))
 
-    readCountAtOffset, baseCountAtOffset, readsAtOffset = gatherData(
+    readCountAtOffset, baseCountAtOffset, readsAtOffset = analyzeOffets(
         genomeLength, alignedReads
     )
 

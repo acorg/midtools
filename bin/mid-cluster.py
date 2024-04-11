@@ -41,6 +41,29 @@ if __name__ == "__main__":
         ),
     )
 
+    parser.add_argument(
+        "--minCCIdentity",
+        type=float,
+        default=ClusterAnalysis.MIN_CC_IDENTITY_DEFAULT,
+        help=(
+            "The minimum nucleotide identity fraction [0.0, 1.0] that a consistent "
+            "component must have with a reference in order to contribute to the "
+            "consensus being made against the reference."
+        ),
+    )
+
+    parser.add_argument(
+        "--noCoverageStrategy",
+        default="N",
+        choices=("N", "reference"),
+        help=(
+            "The approach to use when making a consensus if there are no reads "
+            "covering a site. A value of 'N' means to use an ambigous N nucleotide "
+            "code, whereas a value fo 'reference' means to take the base from the "
+            "reference sequence."
+        ),
+    )
+
     args = parser.parse_args()
 
     referenceIds = (
@@ -58,6 +81,8 @@ if __name__ == "__main__":
         homogeneousCutoff=args.homogeneousCutoff,
         plotSAM=args.plotSAM,
         alternateNucleotideMinFreq=args.alternateNucleotideMinFreq,
+        minCCIdentity=args.minCCIdentity,
+        noCoverageStrategy=args.noCoverageStrategy,
         saveReducedFASTA=args.saveReducedFASTA,
         verbose=args.verbose,
     ).run()

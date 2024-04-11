@@ -110,15 +110,16 @@ def fastaIdentityTable(filename, outputFilename, verbose, filename2=None):
             print("       ", line)
 
 
-def s(count):
+def s(count, suffix="s"):
     """
-    Return an 's' unless a count is singular (i.e., one).
+    Return a suffix unless a count is singular (i.e., one).
 
     @param count: The C{int} count.
-    @return: A C{str}, either '' or 's' depending on whether the count is
+    @param suffix: The C{str} suffix.
+    @return: A C{str}, either '' or the passed suffix depending on whether the count is
         singular.
     """
-    return "" if count == 1 else "s"
+    return "" if count == 1 else suffix
 
 
 def quoted(filename):

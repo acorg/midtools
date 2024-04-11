@@ -205,7 +205,7 @@ def plotAllReferencesSAM(
         wrap(
             f"Best-matched genotypes for {count} reads for {sampleName} "
             f"{sampleGenotypeDesc}from {alignmentFile}.{genotypeReferencesDesc}",
-            width=120,
+            width=175,
         )
     )
 
