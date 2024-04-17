@@ -1,23 +1,28 @@
+from __future__ import annotations
+
 import sys
 from math import log10
+from pathlib import Path
+from typing import Optional, TYPE_CHECKING
 
 from dark.fasta import FastaReads
 from dark.process import Executor
-from dark.reads import Reads
+from dark.reads import Read, Reads
 from dark.sam import SAMFilter, PaddedSAM, samfile
 from dark.utils import pct
 
+if TYPE_CHECKING:
+    from midtools.analysis import ReadAnalysis
+
 from midtools.offsets import analyzeOffets, findSignificantOffsets
-from midtools.plotting import (
-    plotBaseFrequencies,
-    plotCoverageAndSignificantLocations,
-    plotSAM,
-)
+from midtools.plotting import plotSAM
+from midtools.plotting import plotCoverageAndSignificantLocations
+from midtools.plotting import plotBaseFrequencies
 from midtools.read import AlignedRead
 from midtools.utils import baseCountsToStr, commas, quoted, s
 
 
-def _getAlignedReferenceIds(alignmentFiles):
+def _getAlignedReferenceIds(alignmentFiles: list[Path]) -> set[str]:
     """
     Get the ids of all reference sequences in all alignment files.
 
@@ -35,7 +40,9 @@ def _getAlignedReferenceIds(alignmentFiles):
     return alignedReferences
 
 
-def getReferenceIds(readAnalysis, referenceIds):
+def getReferenceIds(
+    readAnalysis: ReadAnalysis, referenceIds: Optional[list[str]]
+) -> set[str]:
     """
     Figure out which reference ids we can process.
 
@@ -104,25 +111,26 @@ def getReferenceIds(readAnalysis, referenceIds):
     return referenceIds
 
 
-def getReferenceLength(referenceId, alignmentFile):
+def getReferenceLength(referenceId: str, alignmentFile: Path) -> Optional[int]:
     """
     Look for a reference name in a BAM file and return its length.
 
     @param referenceId: The C{str} id of the reference sequence.
     @param alignmentFile: The C{Path} to the BAM file supposedly containing matches to
         this reference.
-    @return: An C{int} reference genome length.
+    @return: An C{int} reference genome length or C{None} if the reference is not in
+        the BAM file.
     """
 
     with samfile(alignmentFile) as sam:
         tid = sam.get_tid(referenceId)
         if tid == -1:
-            return
+            return None
         else:
             return sam.lengths[tid]
 
 
-def readReferenceGenomes(referenceGenomeFiles):
+def readReferenceGenomes(referenceGenomeFiles: list[str]) -> dict[str, Read]:
     """
     Read reference genomes from files and check that any duplicates have
     identical sequences.
@@ -169,7 +177,14 @@ class Reference:
     @param outputDir: The C{Path} to the output directory.
     """
 
-    def __init__(self, readAnalysis, referenceId, read, alignmentFile, outputDir):
+    def __init__(
+        self,
+        readAnalysis: ReadAnalysis,
+        referenceId: str,
+        read: AlignedRead,
+        alignmentFile: Path,
+        outputDir: Path,
+    ) -> None:
         self.readAnalysis = readAnalysis
         self.id = referenceId
         self.read = read
@@ -177,31 +192,11 @@ class Reference:
         self.outputDir = outputDir
         self._initialAnalysis()
 
-    def _initialAnalysis(self):
+    def _initialAnalysis(self) -> None:
         """
-        Analyze the given reference id in the given alignment file (if an
-        alignment to the reference id is present).
-
-        @return: C{None} if C{referenceId} is not present in C{alignmentFile}
-            or if no significant offsets are found. Else, a C{dict} containing
-            the signifcant offsets and the consensus sequence that best matches
-            C{referenceId}.
+        Perform an inital analysis of a reference.
         """
-
         report = self.readAnalysis.report
-
-        if self.readAnalysis.plotSAM:
-            filename = self.outputDir / "reads.html"
-            report(f"    Saving reads alignment plot to {str(filename)!r}")
-            plotSAM(
-                SAMFilter(
-                    self.alignmentFile,
-                    referenceIds={self.id},
-                ),
-                filename,
-                title=self.id,
-                jitter=0.45,
-            )
 
         samFilter = SAMFilter(
             self.alignmentFile,
@@ -223,6 +218,22 @@ class Reference:
         # should be the case because the padded SAM queries method adds /2,
         # /3 etc to queries that have more than one alignment.
         assert len(self.alignedReads) == len(set(read.id for read in self.alignedReads))
+
+        if self.readAnalysis.plotSAM:
+            filename = self.outputDir / "reads.html"
+            report(
+                f"    Saving {len(self.alignedReads)} reads alignment plot to "
+                f"{str(filename)!r}"
+            )
+            plotSAM(
+                SAMFilter(
+                    self.alignmentFile,
+                    referenceIds={self.id},
+                ),
+                filename,
+                title=f"Mapping {self.readAnalysis.sampleName} reads against {self.id}",
+                jitter=0.45,
+            )
 
         (
             self.readCountAtOffset,
@@ -293,7 +304,7 @@ class Reference:
         # Extract a consensus according to bcftools.
         self.writeBcftoolsConsensus()
 
-    def _plotCoverageAndSignificantLocations(self):
+    def _plotCoverageAndSignificantLocations(self) -> None:
         """
         Plot coverage and signifcant offsets.
         """
@@ -313,7 +324,7 @@ class Reference:
             title=title,
         )
 
-    def writeBcftoolsConsensus(self):
+    def writeBcftoolsConsensus(self) -> None:
         """
         Write a reference consensus using bcftools.
 
@@ -339,7 +350,7 @@ class Reference:
             for line in e.log:
                 print("    ", line)
 
-    def saveSignificantOffsets(self):
+    def saveSignificantOffsets(self) -> None:
         """
         Save the significant offsets.
         """
@@ -349,7 +360,7 @@ class Reference:
             for offset in self.significantOffsets:
                 print(offset, file=fp)
 
-    def saveBaseFrequencies(self):
+    def saveBaseFrequencies(self) -> None:
         """
         Save the base nucleotide frequencies.
         """
@@ -370,7 +381,7 @@ class Reference:
                     file=fp,
                 )
 
-    def saveReferenceBaseFrequencyPlot(self):
+    def saveReferenceBaseFrequencyPlot(self) -> None:
         """
         Make a plot of the sorted base frequencies for the reference.
         """
@@ -392,7 +403,7 @@ class Reference:
             yRange=None,
         )
 
-    def saveReducedFasta(self):
+    def saveReducedFasta(self) -> None:
         """
         Write out FASTA that contains reads with bases just at the
         significant offsets.

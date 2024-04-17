@@ -1,15 +1,22 @@
+from __future__ import annotations
+
 from collections import defaultdict, Counter
+from typing import Iterable, Optional, TextIO, Iterator, TYPE_CHECKING
+from pathlib import Path
 
 from dark.dna import compareDNAReads
 from dark.fasta import FastaReads
 from dark.reads import Read, Reads
 from dark.utils import pct
 
-from midtools.analysis import ReadAnalysis
+if TYPE_CHECKING:
+    from midtools.analysis import ReadAnalysis
 from midtools.clusters import ReadCluster, ReadClusters
 from midtools.match import matchToString
-from midtools.offsets import analyzeOffets, findSignificantOffsets
+from midtools.offsets import analyzeOffets, findSignificantOffsets, OffsetBases
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
+from midtools.read import AlignedRead
+from midtools.reference import Reference
 from midtools.utils import (
     alignmentQuality,
     baseCountsToStr,
@@ -22,40 +29,6 @@ from midtools.utils import (
 )
 
 
-def connectedComponentsByOffset(significantReads, maxClusterDist, fp, verbose=0):
-    """
-    Yield sets of reads that are connected according to what significant
-    offsets they cover (the nucleotides at those offsets are irrelevant at
-    this point).
-
-    @param significantReads: A C{set} of C{AlignedRead} instances, all of
-        which cover at least one significant offset.
-    @param maxClusterDist: A C{float} indicating the distance beyond which
-        clustering should be aborted.
-    @param fp: A file-like object to write information to.
-    @param verbose: The C{int} verbosity level. Use C{0} for no output.
-    @return: A generator that yields C{Component} instances.
-    """
-    while significantReads:
-        significantRead = sorted(significantReads)[0]
-        significantReads.remove(significantRead)
-        component = {significantRead}
-        offsets = set(significantRead.significantOffsets)
-        addedSomething = True
-        while addedSomething:
-            addedSomething = False
-            reads = set()
-            for read in significantReads:
-                if offsets.intersection(read.significantOffsets):
-                    addedSomething = True
-                    reads.add(read)
-                    offsets.update(read.significantOffsets)
-            if reads:
-                significantReads.difference_update(reads)
-                component.update(reads)
-        yield Component(component, offsets, maxClusterDist, fp, verbose)
-
-
 class ConsistentComponent:
     """
     Hold information about a set of reads that share significant offsets
@@ -65,30 +38,30 @@ class ConsistentComponent:
         will be created.
     """
 
-    def __init__(self, readCluster=None):
+    def __init__(self, readCluster: Optional[ReadCluster] = None) -> None:
         self.readCluster = readCluster or ReadCluster()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.readCluster.reads)
 
     @property
-    def reads(self):
+    def reads(self) -> set[AlignedRead]:
         return self.readCluster.reads
 
     @property
-    def nucleotides(self):
+    def nucleotides(self) -> dict[int, OffsetBases]:
         return self.readCluster.nucleotides
 
-    def add(self, read):
+    def add(self, read: AlignedRead) -> None:
         """
         Add a read to this cluster component.
 
         @param read: An C{alignedRead} instance.
         """
-        return self.readCluster.add(read)
+        self.readCluster.add(read)
 
     @property
-    def offsets(self):
+    def offsets(self) -> set[int]:
         """
         Get the set of significant offsets covered by the reads in this component.
 
@@ -97,7 +70,7 @@ class ConsistentComponent:
         # This is a property to match the property in the Component class.
         return self.readCluster.offsets
 
-    def update(self, reads):
+    def update(self, reads: Iterable[AlignedRead]) -> None:
         """
         Add reads to this cluster component.
 
@@ -106,7 +79,7 @@ class ConsistentComponent:
         for read in reads:
             self.add(read)
 
-    def saveFasta(self, fp):
+    def saveFasta(self, fp: TextIO) -> None:
         """
         Save all reads as FASTA.
 
@@ -115,7 +88,7 @@ class ConsistentComponent:
         for read in sorted(self.readCluster.reads):
             print(read.toString("fasta"), end="", file=fp)
 
-    def savePaddedFasta(self, fp):
+    def savePaddedFasta(self, fp: TextIO) -> None:
         """
         Save all reads as FASTA, padded with gaps to preserve alignment.
 
@@ -124,7 +97,7 @@ class ConsistentComponent:
         for read in sorted(self.readCluster.reads):
             print(read.toPaddedString(), end="", file=fp)
 
-    def consensusBase(self, offset, referenceSequence, infoFp):
+    def consensusBase(self, offset: int, referenceSequence: str, infoFp: TextIO) -> str:
         """
         Get a consensus sequence.
 
@@ -133,7 +106,7 @@ class ConsistentComponent:
             component may not have reads for all offsets.
         @param referenceSequence: The C{str} reference sequence.
         @param infoFp: A file pointer to write draw (and other) info to.
-        @return: A C{str} consensus sequence.
+        @return: A C{str} consensus base.
         """
         if offset in self.readCluster.nucleotides:
             referenceBase = referenceSequence[offset]
@@ -150,7 +123,9 @@ class ConsistentComponent:
 
         return base
 
-    def consensusSequence(self, componentOffsets, referenceSequence, infoFp):
+    def consensusSequence(
+        self, componentOffsets: Iterable[int], referenceSequence: str, infoFp: TextIO
+    ) -> str:
         """
         Get a consensus sequence.
 
@@ -167,7 +142,12 @@ class ConsistentComponent:
         )
 
     def saveConsensus(
-        self, count, componentOffsets, referenceSequence, consensusFp, infoFp
+        self,
+        count: int,
+        componentOffsets: set[int],
+        referenceSequence: str,
+        consensusFp: TextIO,
+        infoFp: TextIO,
     ):
         """
         Save a consensus as FASTA.
@@ -189,7 +169,9 @@ class ConsistentComponent:
         )
         print(Read(id_, sequence).toString("fasta"), file=consensusFp, end="")
 
-    def summarize(self, fp, count, componentOffsets, referenceSequence):
+    def summarize(
+        self, fp: TextIO, count: int, componentOffsets: set[int], referenceSequence: str
+    ) -> None:
         """
         Write out a summary of this consistent component.
 
@@ -239,23 +221,30 @@ class Component:
     @param verbose: The C{int} verbosity level. Use C{0} for no output.
     """
 
-    def __init__(self, reads, offsets, maxClusterDist, fp, verbose=0):
+    def __init__(
+        self,
+        reads: list[AlignedRead],
+        offsets: set[int],
+        maxClusterDist: float,
+        fp: TextIO,
+        verbose: int = 0,
+    ) -> None:
         self.reads = reads
         self.offsets = offsets
         self.maxClusterDist = maxClusterDist
         self.consistentComponents = list(self.findClusters(fp, verbose))
         self._check()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.reads)
 
-    def __lt__(self, other):
+    def __lt__(self, other: Component) -> bool:
         """
         When components are sorted, do so by least offset.
         """
         return min(self.offsets) < min(other.offsets)
 
-    def _check(self):
+    def _check(self) -> None:
         nSelfReads = len(self)
         nCcReads = sum(map(len, self.consistentComponents))
         assert nSelfReads == nCcReads, "%d != %d" % (nSelfReads, nCcReads)
@@ -264,7 +253,7 @@ class Component:
             offsets.update(read.significantOffsets)
         assert offsets == self.offsets
 
-    def summarize(self, fp, count, referenceSequence):
+    def summarize(self, fp: TextIO, count: int, referenceSequence: str) -> None:
         """
         Write out a summary of this component.
 
@@ -295,7 +284,7 @@ class Component:
             print(file=fp)
             cc.summarize(fp, i, self.offsets, referenceSequence)
 
-    def saveFasta(self, outputDir, count, verbose):
+    def saveFasta(self, outputDir: Path, count: int, verbose: int) -> None:
         """
         @param outputDir: The C{Path} to the output directory.
         @param count: The C{int} number of this component.
@@ -317,7 +306,7 @@ class Component:
             with open(filename, "w") as fp:
                 cc.savePaddedFasta(fp)
 
-    def findClusters(self, fp, verbose):
+    def findClusters(self, fp: TextIO, verbose: int) -> Iterator[ConsistentComponent]:
         """
         Find clusters of reads up to the maximum cluster distance threshold in
         self.maxClusterDist according to what nucleotides they have at their
@@ -342,7 +331,9 @@ class Component:
                 )
             yield ConsistentComponent(readCluster)
 
-    def saveConsensuses(self, outputDir, count, referenceSequence, verbose):
+    def saveConsensuses(
+        self, outputDir: Path, count: int, referenceSequence: str, verbose: int
+    ) -> None:
         """
         Write a consensus sequence for each consistent component of this component.
 
@@ -386,7 +377,46 @@ class Component:
         fastaIdentityTable(consensusFilename, identityTableFilename, verbose)
 
 
-class ClusterAnalysis(ReadAnalysis):
+def connectedComponentsByOffset(
+    significantReads: set[AlignedRead],
+    maxClusterDist: float,
+    fp: TextIO,
+    verbose: int = 0,
+) -> Iterator[Component]:
+    """
+    Yield sets of reads that are connected according to what significant
+    offsets they cover (the nucleotides at those offsets are irrelevant at
+    this point).
+
+    @param significantReads: A C{set} of C{AlignedRead} instances, all of
+        which cover at least one significant offset.
+    @param maxClusterDist: A C{float} indicating the distance beyond which
+        clustering should be aborted.
+    @param fp: A file-like object to write information to.
+    @param verbose: The C{int} verbosity level. Use C{0} for no output.
+    @return: A generator that yields C{Component} instances.
+    """
+    while significantReads:
+        significantRead = sorted(significantReads)[0]
+        significantReads.remove(significantRead)
+        component = {significantRead}
+        offsets = set(significantRead.significantOffsets)
+        addedSomething = True
+        while addedSomething:
+            addedSomething = False
+            reads = set()
+            for read in significantReads:
+                if offsets.intersection(read.significantOffsets):
+                    addedSomething = True
+                    reads.add(read)
+                    offsets.update(read.significantOffsets)
+            if reads:
+                significantReads.difference_update(reads)
+                component.update(reads)
+        yield Component(component, offsets, maxClusterDist, fp, verbose)
+
+
+class ClusterAnalysis:
     """
     Perform a clustered read alignment analysis for multiple infection
     detection.
@@ -436,13 +466,13 @@ class ClusterAnalysis(ReadAnalysis):
 
     def __init__(
         self,
-        readAnalysis,
-        maxClusterDist=DEFAULT_MAX_CLUSTER_DIST,
-        alternateNucleotideMinFreq=ALTERNATE_NUCLEOTIDE_MIN_FREQ_DEF,
-        minCCIdentity=MIN_CC_IDENTITY_DEFAULT,
-        noCoverageStrategy="N",
-        plotSAM=False,
-    ):
+        readAnalysis: ReadAnalysis,
+        maxClusterDist: float = DEFAULT_MAX_CLUSTER_DIST,
+        alternateNucleotideMinFreq: float = ALTERNATE_NUCLEOTIDE_MIN_FREQ_DEF,
+        minCCIdentity: float = MIN_CC_IDENTITY_DEFAULT,
+        noCoverageStrategy: str = "N",
+        plotSAM: bool = False,
+    ) -> None:
         self.readAnalysis = readAnalysis
         self.maxClusterDist = maxClusterDist
         self.alternateNucleotideMinFreq = alternateNucleotideMinFreq
@@ -450,7 +480,7 @@ class ClusterAnalysis(ReadAnalysis):
         assert noCoverageStrategy in {"N", "reference"}
         self.noCoverageStrategy = noCoverageStrategy
 
-    def analyzeReference(self, reference):
+    def analyzeReference(self, reference: Reference) -> None:
         """
         Analyze a reference.
 
@@ -483,7 +513,7 @@ class ClusterAnalysis(ReadAnalysis):
             consensusReadCountAtOffset,
         )
 
-    def findConnectedComponents(self, reference):
+    def findConnectedComponents(self, reference: Reference) -> list[Component]:
         """
         Find all connected components.
 
@@ -514,7 +544,9 @@ class ClusterAnalysis(ReadAnalysis):
         assert len(significantReads) == 0
         return sorted(components)
 
-    def saveComponentFasta(self, reference, components):
+    def saveComponentFasta(
+        self, reference: Reference, components: Iterable[Component]
+    ) -> None:
         """
         Save FASTA for each component.
 
@@ -524,7 +556,9 @@ class ClusterAnalysis(ReadAnalysis):
         for count, component in enumerate(components, start=1):
             component.saveFasta(reference.outputDir, count, self.readAnalysis.verbose)
 
-    def saveReferenceComponents(self, reference, components):
+    def saveReferenceComponents(
+        self, reference: Reference, components: Iterable[Component]
+    ):
         """
         Save a FASTA file for the reference containing just the offsets for
         all connected components.
@@ -541,7 +575,9 @@ class ClusterAnalysis(ReadAnalysis):
 
             Reads([read]).filter(keepSites=component.offsets).save(filename)
 
-    def plotConsistentComponents(self, reference, components):
+    def plotConsistentComponents(
+        self, reference: Reference, components: Iterable[Component]
+    ):
         """
         Make a plot of all consistent connected components.
 
@@ -573,7 +609,12 @@ class ClusterAnalysis(ReadAnalysis):
             ),
         )
 
-    def saveClosestReferenceConsensus(self, reference, components, referenceInsertions):
+    def saveClosestReferenceConsensus(
+        self,
+        reference: Reference,
+        components: Iterable[Component],
+        referenceInsertions: dict[str, list[tuple[int, str]]],
+    ) -> None:
         """
         Calculate and save the best consensus to a reference genome.
 
@@ -621,7 +662,9 @@ class ClusterAnalysis(ReadAnalysis):
                 count += componentBase == referenceBase
             return count
 
-        def scoreCcs(reference, component, fp):
+        def scoreCcs(
+            reference: Reference, component: Component, fp: TextIO
+        ) -> list[tuple[float, int, ConsistentComponent]]:
             """
             Score the consistent components in the given C{Component}
             instance according to how well they match the passed reference.
@@ -653,7 +696,11 @@ class ClusterAnalysis(ReadAnalysis):
 
             return result
 
-        def partitionCcs(scoredCcs):
+        def partitionCcs(
+            scoredCcs: list[tuple[float, int, ConsistentComponent]]
+        ) -> tuple[
+            set[tuple[int, ConsistentComponent]], set[tuple[int, ConsistentComponent]]
+        ]:
             """
             Partition the consistent components into high- (nucleotide identity
             with the reference) and low-scoring subsets.
@@ -939,7 +986,7 @@ class ClusterAnalysis(ReadAnalysis):
             wantedReadsBaseCountAtOffset,
         )
 
-    def saveAlternateConsensus(self, reference, consensusRead):
+    def saveAlternateConsensus(self, reference: Reference, consensusRead: Read) -> Read:
         """
         Calculate and save an alternate consensus to a reference genome.
 
@@ -1071,10 +1118,10 @@ class ClusterAnalysis(ReadAnalysis):
 
     def saveConsensusBaseFrequencyPlot(
         self,
-        reference,
-        baseCountAtOffset,
-        readCountAtOffset,
-    ):
+        reference: Reference,
+        baseCountAtOffset: list[Counter],
+        readCountAtOffset: list[Counter],
+    ) -> None:
         """
         Make a plot of the sorted base frequencies for the consensus.
 
@@ -1118,7 +1165,9 @@ class ClusterAnalysis(ReadAnalysis):
             show=False,
         )
 
-    def saveComponentConsensuses(self, reference, components):
+    def saveComponentConsensuses(
+        self, reference: Reference, components: list[Component]
+    ) -> None:
         """
         Write out a component consensus sequence.
 
@@ -1134,7 +1183,7 @@ class ClusterAnalysis(ReadAnalysis):
                 self.readAnalysis.verbose,
             )
 
-    def summarize(self, reference, components):
+    def summarize(self, reference: Reference, components: list[Component]) -> None:
         """
         Write out an analysis summary.
 

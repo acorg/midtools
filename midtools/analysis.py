@@ -3,6 +3,7 @@ from os import unlink
 from pathlib import Path
 from itertools import chain
 from collections import defaultdict
+from typing import Optional, Callable
 
 from dark.dna import compareDNAReads
 from dark.process import Executor
@@ -60,17 +61,17 @@ class ReadAnalysis:
 
     def __init__(
         self,
-        sampleName,
-        alignmentFiles,
-        referenceGenomeFiles,
-        outputDir,
-        referenceIds=None,
-        minReads=DEFAULT_MIN_READS,
-        homogeneousCutoff=DEFAULT_HOMOGENEOUS_CUTOFF,
-        plotSAM=False,
-        saveReducedFASTA=False,
-        verbose=0,
-    ):
+        sampleName: str,
+        alignmentFiles: list[str],
+        referenceGenomeFiles: list[str],
+        outputDir: str,
+        referenceIds: Optional[list[str]] = None,
+        minReads: int = DEFAULT_MIN_READS,
+        homogeneousCutoff: float = DEFAULT_HOMOGENEOUS_CUTOFF,
+        plotSAM: bool = False,
+        saveReducedFASTA: bool = False,
+        verbose: int = 0,
+    ) -> None:
         self.sampleName = sampleName
         self.alignmentFiles = [Path(f) for f in alignmentFiles]
         self.outputDir = Path(outputDir)
@@ -94,7 +95,7 @@ class ReadAnalysis:
 
         self.referenceIds = getReferenceIds(self, referenceIds)
 
-    def report(self, *args, requiredVerbosityLevel=1):
+    def report(self, *args, requiredVerbosityLevel: int = 1) -> None:
         """
         Print a status message, if our verbose setting is high enough.
 
@@ -105,7 +106,9 @@ class ReadAnalysis:
         if self.verbose >= requiredVerbosityLevel:
             print(*args)
 
-    def run(self, analysisFunc):
+    def run(
+        self, analysisFunc: Callable[[Reference], None]
+    ) -> dict[Path, dict[str, Reference]]:
         """
         Perform a read analysis for all reference sequences.
 
@@ -113,7 +116,9 @@ class ReadAnalysis:
             performs specialized analysis on it.
         """
         outputDir = self._setupOutputDir()
-        results = defaultdict(lambda: defaultdict(dict))
+        results: dict[str, dict[str, Reference]] = defaultdict(
+            lambda: defaultdict(dict)
+        )
 
         for alignmentFile in self.alignmentFiles:
             self.report(f"Analyzing alignment file {quoted(alignmentFile)}")
@@ -156,7 +161,7 @@ class ReadAnalysis:
 
         return results
 
-    def analyzeReference(self, reference):
+    def analyzeReference(self, reference: Reference):
         """
         Analyze the given reference id in the given alignment file (if an
         alignment to the reference id is present).
@@ -172,7 +177,7 @@ class ReadAnalysis:
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def _writeAlignmentFileSummary(self, alignmentFile, outputDir):
+    def _writeAlignmentFileSummary(self, alignmentFile: Path, outputDir: Path) -> None:
         """
         Write a summary of alignments.
 
@@ -191,7 +196,9 @@ class ReadAnalysis:
             for line in e.log:
                 print("    ", line)
 
-    def _writeAlignmentHTMLSummary(self, result, outputDir):
+    def _writeAlignmentHTMLSummary(
+        self, result: dict[str, dict[str, Reference]], outputDir: Path
+    ) -> None:
         """
         Write an HTML summary of the overall results.
 
@@ -236,7 +243,9 @@ class ReadAnalysis:
         self.report("  Writing consensus vs consensus identity table to", htmlFilename)
         fastaIdentityTable(consensusesFilename, htmlFilename, self.verbose)
 
-    def _writeOverallResultSummary(self, results, outputDir):
+    def _writeOverallResultSummary(
+        self, results: dict[Path, dict[str, Reference]], outputDir: Path
+    ) -> None:
         """
         Write a summary of the overall results.
 
@@ -319,7 +328,9 @@ class ReadAnalysis:
                         file=fp,
                     )
 
-    def _writeOverallResultSummarySummary(self, results, outputDir):
+    def _writeOverallResultSummarySummary(
+        self, results: dict[Path, dict[str, Reference]], outputDir: Path
+    ) -> None:
         """
         Write a summary of the summary of the overall results.
 
@@ -365,7 +376,7 @@ class ReadAnalysis:
 
                 print(file=fp)
 
-    def _setupOutputDir(self):
+    def _setupOutputDir(self) -> Path:
         """
         Set up the output directory and return its path.
 
@@ -377,11 +388,11 @@ class ReadAnalysis:
             else:
                 self.outputDir.mkdir()
         else:
-            self.outputDir = mkdtemp()
+            self.outputDir = Path(mkdtemp())
             print("Writing output files to %s" % self.outputDir)
         return self.outputDir
 
-    def _alignmentOutputDir(self, alignmentFile, outputDir):
+    def _alignmentOutputDir(self, alignmentFile: Path, outputDir: Path) -> Path:
         """
         Get output directory for a given alignment file.
 
@@ -391,7 +402,7 @@ class ReadAnalysis:
         """
         return outputDir / self.shortAlignmentFilename[alignmentFile]
 
-    def _setupAlignmentOutputDir(self, alignmentFile, outputDir):
+    def _setupAlignmentOutputDir(self, alignmentFile: Path, outputDir: Path) -> Path:
         """
         Set up the output directory for a given alignment file.
 
@@ -427,7 +438,7 @@ class ReadAnalysis:
 
         return directory
 
-    def _removePreExistingTopLevelOutputDirFiles(self):
+    def _removePreExistingTopLevelOutputDirFiles(self) -> None:
         """
         Remove all pre-existing files from the top-level output directory.
         """
@@ -442,7 +453,7 @@ class ReadAnalysis:
             )
             list(map(unlink, paths))
 
-    def _removePreExistingAlignmentDirFiles(self, directory):
+    def _removePreExistingAlignmentDirFiles(self, directory: Path) -> None:
         """
         Remove all pre-existing files from the output directory for an
         alignment.
@@ -472,7 +483,7 @@ class ReadAnalysis:
             )
             list(map(unlink, paths))
 
-    def _removePreExistingReferenceDirFiles(self, directory):
+    def _removePreExistingReferenceDirFiles(self, directory: Path) -> None:
         """
         Remove all pre-existing files from the output directory for a
         particular reference sequence alignment.

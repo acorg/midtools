@@ -1,4 +1,7 @@
-from collections import OrderedDict
+from __future__ import annotations
+
+from typing import Optional
+from pysam import AlignedSegment
 
 from dark.reads import Read
 
@@ -13,8 +16,10 @@ class AlignedRead(Read):
     @param alignment: An optional C{pysam.AlignedSegment} instance.
     """
 
-    def __init__(self, id_, sequence, alignment=None):
-        self.significantOffsets = OrderedDict()
+    def __init__(
+        self, id_: str, sequence: str, alignment: Optional[AlignedSegment] = None
+    ) -> None:
+        self.significantOffsets: dict[int, str] = {}
         self._originalLength = len(sequence)
         self.alignment = alignment
 
@@ -43,7 +48,7 @@ class AlignedRead(Read):
 
         Read.__init__(self, id_, sequence[offset : len(sequence) - trailing].upper())
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.significantOffsets:
             bases = ", bases %s, offsets (total %d): %s" % (
                 "".join(self.significantOffsets.values()),
@@ -60,12 +65,15 @@ class AlignedRead(Read):
             self.id,
         )
 
-    def __lt__(self, other):
+    def __lt__(self, other: object) -> bool:
         """
         Sort order is according to number of signifcant offsets (decreasing),
         then the offset where the alignment begins, then the normal
         C{dark.reads.Read} sort order.
         """
+        if not isinstance(other, AlignedRead):
+            return NotImplemented
+
         t1 = (-len(self.significantOffsets), self.offset)
         t2 = (-len(other.significantOffsets), other.offset)
         if t1 == t2:
@@ -73,7 +81,7 @@ class AlignedRead(Read):
         else:
             return t1 < t2
 
-    def agreesWith(self, other, agreementFraction):
+    def agreesWith(self, other: AlignedRead, agreementFraction: float) -> bool:
         """
         Two reads agree if they have identical bases in a sufficiently high
         fraction of their shared significant offsets.
@@ -95,13 +103,13 @@ class AlignedRead(Read):
         else:
             return True
 
-    def setSignificantOffsets(self, significantOffsets):
+    def setSignificantOffsets(self, significantOffsets: list[int]) -> None:
         """
         Find the base at each of the significant offsets covered by this read.
 
         @param significantOffsets: A C{list} of C{int} offsets.
         """
-        newSignificantOffsets = OrderedDict()
+        newSignificantOffsets = {}
         for offset in significantOffsets:
             base = self.base(offset)
             if base is not None:
@@ -112,7 +120,7 @@ class AlignedRead(Read):
                 newSignificantOffsets[offset] = base
         self.significantOffsets = newSignificantOffsets
 
-    def base(self, n):
+    def base(self, n: int) -> Optional[str]:
         """
         Get the nucleotide base at a given offset.
 
@@ -125,7 +133,9 @@ class AlignedRead(Read):
             b = self.sequence[n - offset]
             return None if b == "-" else b
 
-    def trim(self, n):
+        return None
+
+    def trim(self, n: int) -> bool:
         """
         Trim bases from the start and end of the read.
 
@@ -141,7 +151,7 @@ class AlignedRead(Read):
         else:
             return False
 
-    def toPaddedString(self):
+    def toPaddedString(self) -> str:
         """
         Make a FASTA string for the read, including its original gaps.
         """

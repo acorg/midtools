@@ -1,11 +1,13 @@
 from sklearn.metrics import mutual_info_score
 from sklearn.metrics.cluster import entropy
 
+from typing import Iterable
+
 # from numpy import seterr
 # seterr(divide='raise')
 
 
-def normalized_information_distance(c1, c2):
+def normalized_information_distance(c1: Iterable[str], c2: Iterable[str]) -> float:
     """
     Calculate Normalized Information Distance
 

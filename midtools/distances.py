@@ -1,9 +1,10 @@
+from typing import Any, Callable, Optional
 from collections import defaultdict
 
 from midtools.pqueue import PriorityQueue
 
 
-def _key(a, b):
+def _key(a, b) -> tuple[int, int]:
     return (a, b) if a <= b else (b, a)
 
 
@@ -15,12 +16,12 @@ class DistanceCache:
     @param distFunc: A function that computes the distance between two objects.
     """
 
-    def __init__(self, distFunc):
+    def __init__(self, distFunc: Callable[[Any, Any], float]) -> None:
         self._distFunc = distFunc
-        self._distances = defaultdict(dict)
+        self._distances: dict[Any, dict[Any, float]] = defaultdict(dict)
         self._pq = PriorityQueue()
 
-    def distance(self, a, b):
+    def distance(self, a: Any, b: Any) -> float:
         """
         Find the distance between a pair of objects.
 
@@ -31,7 +32,7 @@ class DistanceCache:
         """
         return self._distances[a][b]
 
-    def add(self, a):
+    def add(self, a: Any) -> None:
         """
         Add an object.
 
@@ -50,7 +51,7 @@ class DistanceCache:
             # will be found when subsequent elements are added.
             self._distances[a]
 
-    def lowestDistance(self):
+    def lowestDistance(self) -> Optional[float]:
         """
         Get the lowest distance between any two clusters.
 
@@ -61,7 +62,7 @@ class DistanceCache:
         except KeyError:
             return None
 
-    def pop(self):
+    def pop(self) -> tuple[Any, Any]:
         """
         Pop the lowest distance cluster pair.
 
@@ -70,7 +71,7 @@ class DistanceCache:
         """
         return self._pq.pop()
 
-    def __contains__(self, pair):
+    def __contains__(self, pair: tuple[Any, Any]) -> bool:
         """
         Test if a pair has a computed distance (useful for testing).
 
@@ -85,7 +86,7 @@ class DistanceCache:
         else:
             return True
 
-    def remove(self, a):
+    def remove(self, a: Any) -> None:
         """
         Remove an object.
 

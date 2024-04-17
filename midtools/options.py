@@ -1,10 +1,14 @@
+from collections import Counter
+from typing import Optional
+from argparse import ArgumentParser, Namespace
+
 from dark.sam import SAMFilter, PaddedSAM
 
 from midtools.offsets import analyzeOffets, findSignificantOffsets
 from midtools.read import AlignedRead
 
 
-def addCommonOptions(parser):
+def addCommonOptions(parser: ArgumentParser) -> None:
     """
     Add standard command-line options to an argument parser.
 
@@ -33,7 +37,9 @@ def addCommonOptions(parser):
     )
 
 
-def addCommandLineOptions(parser, outfileDefaultName=None):
+def addCommandLineOptions(
+    parser: ArgumentParser, outfileDefaultName: Optional[str] = None
+):
     """
     Add standard command-line options to an argument parser.
 
@@ -58,7 +64,17 @@ def addCommandLineOptions(parser, outfileDefaultName=None):
     )
 
 
-def parseCommandLineOptions(args, returnSignificantOffsets=True):
+def parseCommandLineOptions(
+    args: Namespace, returnSignificantOffsets: bool = True
+) -> tuple[
+    int,
+    list[AlignedRead],
+    PaddedSAM,
+    list[int],
+    list[Counter],
+    list[set[AlignedRead]],
+    Optional[list[int]],
+]:
     """
     Deal with the various command-line options added to the ArgumentParser
     instance by addCommandLineOptions.
@@ -73,7 +89,7 @@ def parseCommandLineOptions(args, returnSignificantOffsets=True):
         readCountAtOffset, baseCountAtOffset, readsAtOffset,
         significantOffsets).
     """
-    genomeLength = None
+    genomeLength = -1
     alignedReads = []
     samFilter = SAMFilter.parseFilteringOptions(args)
 
@@ -125,7 +141,7 @@ def parseCommandLineOptions(args, returnSignificantOffsets=True):
     )
 
 
-def addAnalysisCommandLineOptions(parser):
+def addAnalysisCommandLineOptions(parser: ArgumentParser) -> None:
     """
     Add command-line options used in a read analysis.
     """
