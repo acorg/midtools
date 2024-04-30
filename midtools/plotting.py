@@ -194,7 +194,7 @@ def plotAllReferencesSAM(
                     f"<b>{gt}</b>: "
                     + ", ".join(sorted(genotypeReferences[gt], key=sampleIdKey))
                 )
-                for gt in genotypes
+                for gt in sorted(genotypes)
                 if genotypeCount[gt]
             )
             + "."
