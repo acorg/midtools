@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from itertools import count
+from typing import Optional, TextIO, ValuesView
+
+from dark.reads import Read
 
 from midtools.distances import DistanceCache
 from midtools.offsets import OffsetBases
+from midtools.read import AlignedRead
 from midtools.utils import nucleotidesToStr, s
 
 
@@ -13,21 +19,21 @@ class ReadCluster:
 
     MIN_COMMONEST_MULTIPLE = 10.0
 
-    def __init__(self):
-        self.nucleotides = defaultdict(OffsetBases)
-        self.reads = set()
+    def __init__(self) -> None:
+        self.nucleotides: dict[int, OffsetBases] = defaultdict(OffsetBases)
+        self.reads: set[AlignedRead] = set()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.reads)
 
-    def __str__(self):
+    def __str__(self) -> str:
         result = ["Cluster with %d read%s:" % (len(self.reads), s(len(self.reads)))]
         for read in self.reads:
             result.append("  %s" % read)
         result.append(nucleotidesToStr(self.nucleotides, prefix="  "))
         return "\n".join(result)
 
-    def add(self, read):
+    def add(self, read: AlignedRead) -> None:
         """
         Add a read to this cluster.
 
@@ -40,16 +46,16 @@ class ReadCluster:
         for offset, base in read.significantOffsets.items():
             nucleotides[offset].incorporateBase(base)
 
-    def update(self, reads):
+    def update(self, reads: list[AlignedRead]) -> None:
         """
         Add reads to this cluster.
 
-        @param reads: An iterable of C{alignedRead} instances.
+        @param reads: An iterable of C{AlignedRead} instances.
         """
         for read in reads:
             self.add(read)
 
-    def merge(self, other):
+    def merge(self, other: ReadCluster) -> None:
         """
         Merge another cluster into this one.
 
@@ -63,7 +69,7 @@ class ReadCluster:
             self.nucleotides[offset].merge(offsetBases)
 
     @property
-    def offsets(self):
+    def offsets(self) -> set[int]:
         """
         Get the set of significant offsets covered by the reads in this component.
 
@@ -74,7 +80,7 @@ class ReadCluster:
         return set(self.nucleotides)
 
     @staticmethod
-    def commonOffsetsMaxFraction(a, b):
+    def commonOffsetsMaxFraction(a: ReadCluster, b: ReadCluster) -> float:
         """
         Compute the fraction of a cluster's sites that are in common with
         another cluster. Do this for two clusters and return the higher
@@ -96,7 +102,9 @@ class ReadCluster:
         return len(common) / min(len(a.nucleotides), len(b.nucleotides))
 
     @staticmethod
-    def commonNucleotidesMultiplicativeDistance(a, b):
+    def commonNucleotidesMultiplicativeDistance(
+        a: ReadCluster, b: ReadCluster
+    ) -> float:
         """
         Measure the distance from one cluster to another, as 1.0 minus
         the average similarity across all common offsets.
@@ -125,7 +133,7 @@ class ReadCluster:
             return 1.0
 
     @staticmethod
-    def commonNucleotidesAgreementDistance(a, b):
+    def commonNucleotidesAgreementDistance(a: ReadCluster, b: ReadCluster) -> float:
         """
         Measure the distance from one cluster to another.
 
@@ -194,13 +202,13 @@ class ReadClusters:
 
     COMMON_OFFSETS_MAX_FRACTION_MIN = 0.9
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._count = count()
         self.readClusters = defaultdict(ReadCluster)
         # self.distanceCache = DistanceCache(self.multiplicativeDistance)
         self.distanceCache = DistanceCache(self.commonNucleotidesAgreementDistance)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Our length is the number of read clusters.
 
@@ -208,7 +216,7 @@ class ReadClusters:
         """
         return len(self.readClusters)
 
-    def add(self, read):
+    def add(self, read: Read) -> int:
         """
         Add a single read as a new cluster.
 
@@ -219,7 +227,7 @@ class ReadClusters:
         self.readClusters[count].add(read)
         return count
 
-    def commonNucleotidesAgreementDistance(self, a, b):
+    def commonNucleotidesAgreementDistance(self, a: int, b: int) -> float:
         """
         Measure the distance from one cluster to another based on the fraction
         of shared offsets where the commonest nucleotide(s) for the offset
@@ -241,7 +249,7 @@ class ReadClusters:
             )
         )
 
-    def multiplicativeDistance(self, a, b):
+    def multiplicativeDistance(self, a: int, b: int) -> float:
         """
         Calculate an inter-cluster distance based on the maximum fraction of
         offsets (for the two clusters) present in common and the
@@ -262,7 +270,7 @@ class ReadClusters:
             )
         )
 
-    def mergeDescription(self, a, b, distance):
+    def mergeDescription(self, a: int, b: int, distance: float) -> str:
         """
         Make a textual description of a cluster merge.
 
@@ -357,7 +365,7 @@ class ReadClusters:
             ]
         )
 
-    def mergeDescriptionWithOffsetScores(self, a, b, distance):
+    def mergeDescriptionWithOffsetScores(self, a: int, b: int, distance: float) -> str:
         """
         Make a textual description of a cluster merge, including per-offset
         score information.
@@ -468,7 +476,9 @@ class ReadClusters:
             ]
         )
 
-    def analyze(self, cutoff, fp=None):
+    def analyze(
+        self, cutoff: float, fp: Optional[TextIO] = None
+    ) -> ValuesView[ReadCluster]:
         """
         Perform the cluster analysis, up to a given distance cut-off.
 

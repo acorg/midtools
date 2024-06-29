@@ -6,7 +6,7 @@ from dark.sam import SAMFilter
 from midtools.plotting import plotAllReferencesSAM
 
 
-def makeParser():
+def makeParser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=(
@@ -30,7 +30,7 @@ def makeParser():
     return parser
 
 
-def main():
+def main() -> None:
     args = makeParser().parse_args()
 
     plotAllReferencesSAM(

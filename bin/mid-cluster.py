@@ -2,6 +2,7 @@
 
 from itertools import chain
 
+from midtools.analysis import ReadAnalysis
 from midtools.clusterAnalysis import ClusterAnalysis
 from midtools.options import addAnalysisCommandLineOptions
 
@@ -70,19 +71,25 @@ if __name__ == "__main__":
         list(chain.from_iterable(args.referenceId)) if args.referenceId else None
     )
 
-    ClusterAnalysis(
+    analysis = ReadAnalysis(
         args.sampleName,
         list(chain.from_iterable(args.alignmentFile)),
         list(chain.from_iterable(args.referenceGenome)),
         args.outputDir,
         referenceIds=referenceIds,
         minReads=args.minReads,
-        maxClusterDist=args.maxClusterDist,
         homogeneousCutoff=args.homogeneousCutoff,
         plotSAM=args.plotSAM,
+        saveReducedFASTA=args.saveReducedFASTA,
+        verbose=args.verbose,
+    )
+
+    clusterAnalysis = ClusterAnalysis(
+        analysis,
+        maxClusterDist=args.maxClusterDist,
         alternateNucleotideMinFreq=args.alternateNucleotideMinFreq,
         minCCIdentity=args.minCCIdentity,
         noCoverageStrategy=args.noCoverageStrategy,
-        saveReducedFASTA=args.saveReducedFASTA,
-        verbose=args.verbose,
-    ).run()
+    )
+
+    analysis.run(clusterAnalysis.analyzeReference)

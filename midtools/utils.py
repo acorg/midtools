@@ -1,23 +1,30 @@
 import colorlover as cl
 from collections import Counter
+from typing import Optional, TextIO, Iterable, Any, Union
+from pathlib import Path
+from pysam import AlignedSegment
 
 from dark.process import Executor
 
+from midtools.offsets import OffsetBases
 
-def baseCountsToStr(counts):
+
+def baseCountsToStr(counts: OffsetBases | Counter[str]) -> str:
     """
     Convert base counts to a string.
 
     @param counts: A C{Counter} instance.
     @return: A C{str} representation of nucleotide counts at an offset.
     """
-    if not isinstance(counts, Counter):
+    if isinstance(counts, OffsetBases):
         counts = counts._counts
 
     return " ".join([("%s:%d" % (base, counts[base])) for base in sorted(counts)])
 
 
-def nucleotidesToStr(nucleotides, prefix=""):
+def nucleotidesToStr(
+    nucleotides: dict[int, Union[Counter, OffsetBases]], prefix: str = ""
+) -> str:
     """
     Convert offsets and base counts to a string.
 
@@ -37,7 +44,12 @@ def nucleotidesToStr(nucleotides, prefix=""):
     return "\n".join(result)
 
 
-def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
+def commonest(
+    counts: Union[Counter, OffsetBases],
+    drawBreaker: str,
+    drawFp: Optional[TextIO] = None,
+    drawMessage: Optional[str] = None,
+) -> str:
     """
     Return the key of the Counter instance that is the most common.
 
@@ -82,7 +94,12 @@ def commonest(counts, drawBreaker, drawFp=None, drawMessage=None):
         return orderedCounts[0][0]
 
 
-def fastaIdentityTable(filename, outputFilename, verbose, filename2=None):
+def fastaIdentityTable(
+    filename: Path,
+    outputFilename: Path,
+    verbose: bool,
+    filename2: Optional[Path] = None,
+) -> None:
     """
     Call fasta-identity-table.py to produce an HTML identity table
     for one or two FASTA files.
@@ -110,7 +127,7 @@ def fastaIdentityTable(filename, outputFilename, verbose, filename2=None):
             print("       ", line)
 
 
-def s(count, suffix="s"):
+def s(count: int, suffix: str = "s") -> str:
     """
     Return a suffix unless a count is singular (i.e., one).
 
@@ -122,7 +139,7 @@ def s(count, suffix="s"):
     return "" if count == 1 else suffix
 
 
-def quoted(filename):
+def quoted(filename: Path) -> str:
     """
     Return a single-quoted string for a filename.
 
@@ -132,7 +149,7 @@ def quoted(filename):
     return f"{str(filename)!r}"
 
 
-def commas(iterable):
+def commas(iterable: Iterable[Any]) -> str:
     """
     Turn an iterable into a sorted comma-separated string.
 
@@ -142,11 +159,14 @@ def commas(iterable):
     return ", ".join(map(str, sorted(iterable)))
 
 
-def alignmentQuality(alignment):
+def alignmentQuality(alignment: AlignedSegment) -> str:
     """
     Produce an alignment quality string from a pysam alignment.
 
     @param alignment: A C{pysam.AlignedSegment} instance.
     @return: A C{str} quality string.
     """
+    if alignment.query_qualities is None:
+        raise ValueError(f"Aligned segment {alignment} with None query qualities.")
+
     return "".join(map(lambda x: chr(x + 33), alignment.query_qualities))

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 from random import uniform
 import plotly
 from plotly.subplots import make_subplots
@@ -9,10 +12,15 @@ from json import dump
 from itertools import cycle
 from collections import Counter, defaultdict
 from textwrap import wrap
+from typing import Optional, TYPE_CHECKING
 
 from dark.dna import compareDNAReads
 from dark.fasta import FastaReads
+from dark.sam import SAMFilter
 
+if TYPE_CHECKING:
+    from midtools.clusterAnalysis import Component
+    from midtools.reference import Reference
 from midtools.entropy import entropy2, MAX_ENTROPY
 from midtools.match import matchToString
 from midtools.utils import s, baseCountsToStr
@@ -24,14 +32,14 @@ from pyhbv.samples import UNKNOWN, sampleIdKey
 
 
 def plotSAM(
-    samFilter,
-    outfile,
-    title="Reads",
-    titleFontSize=18,
-    axisFontSize=16,
-    show=False,
-    jitter=0.0,
-):
+    samFilter: SAMFilter,
+    outfile: Path,
+    title: str = "Reads",
+    titleFontSize: int = 18,
+    axisFontSize: int = 16,
+    show: bool = False,
+    jitter: float = 0.0,
+) -> None:
     """
     Plot the alignments found in a SAM file.
     """
@@ -74,17 +82,11 @@ def plotSAM(
     }
 
     yaxis = {
-        "title": "score",
+        "title": "Alignment score",
         "titlefont": {
             "size": axisFontSize,
         },
     }
-
-    title = "%s<br>%d reads%s" % (
-        title,
-        count,
-        "" if jitter == 0.0 else (" (jitter %.2f)" % jitter),
-    )
 
     layout = go.Layout(
         title=title,
@@ -100,16 +102,16 @@ def plotSAM(
 
 
 def plotAllReferencesSAM(
-    samFilter,
-    outfile,
-    sampleName,
-    alignmentFile,
-    hbv=False,
-    jitter=0.0,
-    titleFontSize=14,
-    axisFontSize=12,
-    show=False,
-):
+    samFilter: SAMFilter,
+    outfile: Path,
+    sampleName: str,
+    alignmentFile: Path,
+    hbv: bool = False,
+    jitter: float = 0.0,
+    titleFontSize: int = 14,
+    axisFontSize: int = 12,
+    show: bool = False,
+) -> None:
     """
     Plot the alignments found in a SAM file, even if the references are different
     lengths.
@@ -139,7 +141,7 @@ def plotAllReferencesSAM(
 
     data = []
     inLegend = set()
-    genotypeCount = Counter()
+    genotypeCount: Counter[str] = Counter()
 
     count = 0
     for count, alignment in enumerate(samFilter.alignments(), start=1):
@@ -192,7 +194,7 @@ def plotAllReferencesSAM(
                     f"<b>{gt}</b>: "
                     + ", ".join(sorted(genotypeReferences[gt], key=sampleIdKey))
                 )
-                for gt in genotypes
+                for gt in sorted(genotypes)
                 if genotypeCount[gt]
             )
             + "."
@@ -250,16 +252,16 @@ def plotAllReferencesSAM(
 
 
 def _plotSortedMaxBaseFrequencies(
-    significantOffsets,
-    baseCountAtOffset,
-    readCountAtOffset,
-    outfile,
-    title,
-    histogram,
-    show,
-    titleFontSize,
-    axisFontSize,
-):
+    significantOffsets: list[int],
+    baseCountAtOffset: list[Counter[str]],
+    readCountAtOffset: list[int],
+    outfile: Path,
+    title: str,
+    histogram: bool,
+    show: bool,
+    titleFontSize: int,
+    axisFontSize: int,
+) -> list[list[float], str]:
     """
     Plot the sorted maximum base frequency for each of the significant
     offsets.
@@ -346,16 +348,16 @@ def _plotSortedMaxBaseFrequencies(
 
 
 def _plotBaseFrequenciesEntropy(
-    significantOffsets,
-    baseCountAtOffset,
-    readCountAtOffset,
-    outfile,
-    title,
-    histogram,
-    show,
-    titleFontSize,
-    axisFontSize,
-):
+    significantOffsets: list[int],
+    baseCountAtOffset: list[Counter[str]],
+    readCountAtOffset: list[int],
+    outfile: Path,
+    title: str,
+    histogram: bool,
+    show: bool,
+    titleFontSize: int,
+    axisFontSize: int,
+) -> list[list[float], str]:
     """
     Plot the sorted entropy of base frequencies for each of the significant
     offsets.
@@ -436,17 +438,17 @@ def _plotBaseFrequenciesEntropy(
 
 
 def _plotBaseFrequenciesAllOffsets(
-    genomeLength,
-    significantOffsets,
-    baseCountAtOffset,
-    readCountAtOffset,
-    outfile,
-    title,
-    show,
-    titleFontSize,
-    axisFontSize,
-    yRange,
-):
+    genomeLength: int,
+    significantOffsets: list[int],
+    baseCountAtOffset: list[Counter[str]],
+    readCountAtOffset: list[int],
+    outfile: Path,
+    title: str,
+    show: bool,
+    titleFontSize: int,
+    axisFontSize: int,
+    yRange: tuple[int, int],
+) -> None:
     """
     Plot the (sorted) base frequencies for each of the significant offsets.
     """
@@ -515,16 +517,16 @@ def _plotBaseFrequenciesAllOffsets(
 
 
 def _plotBaseFrequencies(
-    significantOffsets,
-    baseCountAtOffset,
-    readCountAtOffset,
-    outfile,
-    title,
-    show,
-    titleFontSize,
-    axisFontSize,
-    yRange,
-):
+    significantOffsets: list[int],
+    baseCountAtOffset: list[Counter[str]],
+    readCountAtOffset: list[int],
+    outfile: Path,
+    title: str,
+    show: bool,
+    titleFontSize: int,
+    axisFontSize: int,
+    yRange: tuple[int, int],
+) -> None:
     """
     Plot the (sorted) base frequencies for each of the significant offsets.
     """
@@ -581,23 +583,23 @@ def _plotBaseFrequencies(
 
 
 def plotBaseFrequencies(
-    genomeLength,
-    significantOffsets,
-    baseCountAtOffset,
-    readCountAtOffset,
-    outfile,
-    title=None,
-    sampleName=None,
-    valuesFile=None,
-    minReads=5,
-    homogeneousCutoff=0.9,
-    sortOn=None,
-    histogram=False,
-    show=False,
-    titleFontSize=12,
-    axisFontSize=12,
-    yRange=(0.0, 1.0),
-):
+    genomeLength: int,
+    significantOffsets: list[int],
+    baseCountAtOffset: list[Counter[str]],
+    readCountAtOffset: list[int],
+    outfile: Path,
+    title: Optional[str] = None,
+    titleFontSize: int = 12,
+    axisFontSize: int = 12,
+    yRange: tuple[float, float] = (0.0, 1.0),
+    sampleName: Optional[str] = None,
+    valuesFile: Optional[Path] = None,
+    minReads: int = 5,
+    homogeneousCutoff: float = 0.9,
+    sortOn: Optional[str] = None,
+    histogram: bool = False,
+    show: bool = False,
+) -> None:
     """
     Plot sorted base frequencies at signifcant sites.
 
@@ -665,7 +667,9 @@ def plotBaseFrequencies(
             )
 
 
-def plotCoverage(fig, row, col, readCountAtOffset, genomeLength):
+def plotCoverage(
+    fig, row: int, col: int, readCountAtOffset: list[int], genomeLength: int
+) -> None:
     """
     Plot the read coverage along the genome.
     """
@@ -693,7 +697,9 @@ def plotCoverage(fig, row, col, readCountAtOffset, genomeLength):
     )
 
 
-def plotSignificantOffsets(fig, row, col, significantOffsets, genomeLength):
+def plotSignificantOffsets(
+    fig, row: int, col: int, significantOffsets: list[int], genomeLength: int
+) -> None:
     """
     Plot the genome offsets that are significant.
     """
@@ -717,8 +723,13 @@ def plotSignificantOffsets(fig, row, col, significantOffsets, genomeLength):
 
 
 def plotCoverageAndSignificantLocations(
-    readCountAtOffset, genomeLength, significantOffsets, outfile, title=None, show=False
-):
+    readCountAtOffset: list[int],
+    genomeLength: int,
+    significantOffsets: list[int],
+    outfile: Path,
+    title: Optional[str] = None,
+    show: bool = False,
+) -> None:
     """
     Plot read coverage and the significant locations.
     """
@@ -739,31 +750,23 @@ def plotCoverageAndSignificantLocations(
 
 
 def plotConsistentComponents(
-    referenceId,
-    genomeLength,
-    components,
-    significantOffsets,
-    outfile,
-    infoFile,
-    outputDir,
-    title="Consistent components",
-    show=False,
-    titleFontSize=12,
-    axisFontSize=12,
-    minReadsPerConsistentComponent=2,
-):
+    reference: Reference,
+    components: list[Component],
+    outfile: Path,
+    infoFile: Path,
+    title: str = "Consistent components",
+    show: bool = False,
+    titleFontSize: int = 12,
+    axisFontSize: int = 12,
+    minReadsPerConsistentComponent: int = 2,
+) -> None:
     """
     Make a plot of all consistent connected components.
 
-    @param referenceId: The C{str} id of the reference sequence.
-    @param genomeLength: The C{int} length of the genome the reads were
-        aligned to.
+    @param reference: A C{Reference} instance.
     @param components: A C{list} of C{ComponentByOffsets} instances.
-    @param significantOffsets: A C{set} of signifcant offsets.
     @param outfile: The C{Path} to a file to write the plot to.
     @param infofile: The C{Path} to a file to write informative text output to.
-    @param outputDir: The C{Path} to the output directory.
-    @param alignmentFile: The C{str} name of an alignment file.
     @param title: The C{str} title for the plot.
     @param titleFontSize: The C{int} title font size.
     @param axisFontSize: The C{int} axis font size.
@@ -772,7 +775,7 @@ def plotConsistentComponents(
         be shown.
     """
 
-    def offsetsToLocationsStr(offsets):
+    def offsetsToLocationsStr(offsets: list[int]) -> str:
         """
         Convert a list of zero-based offsets into a 1-based comma-separated string.
 
@@ -786,9 +789,9 @@ def plotConsistentComponents(
         print(
             "There are %d significant location%s: %s"
             % (
-                len(significantOffsets),
-                s(len(significantOffsets)),
-                offsetsToLocationsStr(significantOffsets),
+                len(reference.significantOffsets),
+                s(len(reference.significantOffsets)),
+                offsetsToLocationsStr(reference.significantOffsets),
             ),
             file=fp,
         )
@@ -806,11 +809,13 @@ def plotConsistentComponents(
 
             # Get the reference sequence for the component.
             reads = list(
-                FastaReads(outputDir / ("component-%d-consensuses.fasta" % count))
+                FastaReads(
+                    reference.outputDir / ("component-%d-consensuses.fasta" % count)
+                )
             )
 
-            reference = reads[0]
-            length = len(reference)
+            componentReferenceRead = reads[0]
+            length = len(componentReferenceRead)
             minOffset = min(component.offsets)
             maxOffset = max(component.offsets)
 
@@ -907,9 +912,12 @@ def plotConsistentComponents(
                     file=fp,
                 )
 
-                match = compareDNAReads(reference, consensus)
+                match = compareDNAReads(componentReferenceRead, consensus)
                 print(
-                    matchToString(match, reference, consensus, indent="    "), file=fp
+                    matchToString(
+                        match, componentReferenceRead, consensus, indent="    "
+                    ),
+                    file=fp,
                 )
 
                 identicalMatchCount = match["match"]["identicalMatchCount"]
@@ -929,7 +937,7 @@ def plotConsistentComponents(
                 for index, offset in enumerate(sorted(component.offsets)):
                     if offset in cc.nucleotides:
                         consensusBase = consensus.sequence[index]
-                        referenceBase = reference.sequence[index]
+                        referenceBase = componentReferenceRead.sequence[index]
 
                         if consensusBase == referenceBase:
                             identical.append(len(x))
@@ -976,12 +984,15 @@ def plotConsistentComponents(
                 )
 
     # Add the significant offsets.
-    n = len(significantOffsets)
+    n = len(reference.significantOffsets)
     data.append(
         go.Scatter(
-            x=[offset + 1 for offset in significantOffsets],
+            x=[offset + 1 for offset in reference.significantOffsets],
             y=[-0.05] * n,
-            text=[f"Significant site {offset + 1}" for offset in significantOffsets],
+            text=[
+                f"Significant site {offset + 1}"
+                for offset in reference.significantOffsets
+            ],
             hoverinfo="text",
             mode="markers",
             name=f"Significant sites ({n})",
@@ -994,7 +1005,7 @@ def plotConsistentComponents(
             "size": titleFontSize,
         },
         xaxis={
-            "range": (0, genomeLength + 1),
+            "range": (0, len(reference.read) + 1),
             "title": "Genome location",
             "titlefont": {
                 "size": axisFontSize,

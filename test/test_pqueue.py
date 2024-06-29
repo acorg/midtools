@@ -1,7 +1,5 @@
 from unittest import TestCase
 
-from six import assertRaisesRegex
-
 from midtools.pqueue import PriorityQueue
 
 
@@ -15,16 +13,16 @@ class TestPriorityQueue(TestCase):
         The lowestPriority method must raise a KeyError if the queue is empty.
         """
         pq = PriorityQueue()
-        error = "peek on an empty priority queue"
-        assertRaisesRegex(self, KeyError, error, pq.lowestPriority)
+        error = "lowestPriority called on an empty priority queue"
+        self.assertRaisesRegex(KeyError, error, pq.lowestPriority)
 
     def testPopRaisesOnEmpty(self):
         """
         The pop method must raise a KeyError if the queue is empty.
         """
         pq = PriorityQueue()
-        error = "pop from an empty priority queue"
-        assertRaisesRegex(self, KeyError, error, pq.pop)
+        error = "pop called on an empty priority queue"
+        self.assertRaisesRegex(KeyError, error, pq.pop)
 
     def testEmptyLength(self):
         """
@@ -35,7 +33,7 @@ class TestPriorityQueue(TestCase):
 
     def testLengthAfterAdd(self):
         """
-        An queue with one thing in it must have a length of one.
+        A queue with one thing in it must have a length of one.
         """
         pq = PriorityQueue()
         pq.add(3)
@@ -43,7 +41,7 @@ class TestPriorityQueue(TestCase):
 
     def testLengthAfterDoubleAdd(self):
         """
-        An queue with an item that is added twice must have a length of one.
+        A queue with an item that is added twice must have a length of one.
         """
         pq = PriorityQueue()
         pq.add(3)

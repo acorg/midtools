@@ -1,7 +1,9 @@
 from random import uniform, choice
 
+from dark.reads import Read
 
-def mutateRead(read, rate, alphabet="ACGT"):
+
+def mutateRead(read: Read, rate: float, alphabet: str = "ACGT") -> list[int]:
     """
     Mutate the bases of a read.
 

@@ -1,4 +1,8 @@
-def _pct(a, b):
+from dark.reads import Read
+from typing import Optional
+
+
+def _pct(a: int, b: int) -> float:
     """
     What percent of a is b?
 
@@ -9,7 +13,7 @@ def _pct(a, b):
     return 100.0 * a / b if b else 0.0
 
 
-def _pp(mesg, count, len1, len2=None):
+def _pp(mesg: str, count: int, len1: int, len2: Optional[int] = None) -> str:
     """
     Format a message followed by an integer count and a percentage (or
     two, if the sequence lengths are unequal).
@@ -35,7 +39,14 @@ def _pp(mesg, count, len1, len2=None):
             )
 
 
-def matchToString(dnaMatch, read1, read2, strict=False, indent="", offsets=None):
+def matchToString(
+    dnaMatch: dict,
+    read1: Read,
+    read2: Read,
+    strict: bool = False,
+    indent: str = "",
+    offsets: Optional[set[int]] = None,
+) -> str:
     """
     Format a DNA match as a string.
 
@@ -56,7 +67,7 @@ def matchToString(dnaMatch, read1, read2, strict=False, indent="", offsets=None)
     else:
         len1, len2 = map(len, (read1, read2))
 
-    result = []
+    result: list[str] = []
     append = result.append
 
     append(_pp("%sExact matches" % indent, identicalMatchCount, len1, len2))
