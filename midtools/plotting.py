@@ -583,7 +583,6 @@ def _plotBaseFrequencies(
 
 
 def plotBaseFrequencies(
-    genomeLength: int,
     significantOffsets: list[int],
     baseCountAtOffset: list[Counter[str]],
     readCountAtOffset: list[int],
