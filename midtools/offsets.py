@@ -196,7 +196,7 @@ def analyzeOffets(
 def processOffset(alignedReads, offset):
     nucleotides = set("ACGT")
     reads = set()
-    counts: Counter[str] = Counter()
+    counts: Counter[str] = Counter({n: 0 for n in nucleotides})
     for read in alignedReads:
         base = read.base(offset)
         if base in nucleotides:
