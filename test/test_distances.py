@@ -10,19 +10,21 @@ class TestDistanceCache(TestCase):
     Test the DistanceCache class.
     """
 
-    def testEmpty(self):
+    def testDistanceFunction(self) -> None:
         """
         The distance group must give a distance as provided by the distance
-        function on two new elements.
+        function.
         """
 
-        def dist(a, b):
+        def dist(*_) -> int:
             return 4
 
         dc = DistanceCache(dist)
-        # self.assertEqual(4, dc.distance('hey', 'you'))
+        dc.add("hey")
+        dc.add("you")
+        self.assertEqual(4, dc.distance("hey", "you"))
 
-    def testRepeatedCall(self):
+    def testRepeatedCall(self) -> None:
         """
         The distance group must only call the distance function once when asked
         for the distance between two elements it has already computed a
@@ -30,7 +32,7 @@ class TestDistanceCache(TestCase):
         """
         count = 0
 
-        def dist(a, b):
+        def dist(*_) -> int:
             nonlocal count
             count += 1
             return 4
@@ -43,13 +45,13 @@ class TestDistanceCache(TestCase):
         self.assertEqual(4, dc.distance("hey", "you"))
         self.assertEqual(1, count)
 
-    def testDistanceOnRemovedPair(self):
+    def testDistanceOnRemovedPair(self) -> None:
         """
         The distance method must raise KeyError if called on a pair of objects
         that have been removed.
         """
 
-        def dist(a, b):
+        def dist(*_) -> int:  # pyright: ignore[reportUnusedParameter]
             return 4
 
         dc = DistanceCache(dist)
@@ -64,13 +66,13 @@ class TestDistanceCache(TestCase):
         error = "you"
         assertRaisesRegex(self, KeyError, error, dc.distance, "hey", "you")
 
-    def testDistanceOnRemovedOneOfPair(self):
+    def testDistanceOnRemovedOneOfPair(self) -> None:
         """
         The distance method must raise KeyError if called on a pair of objects
         one of which has been removed.
         """
 
-        def dist(a, b):
+        def dist(*_) -> int:  # pyright: ignore[reportUnusedParameter]
             return 4
 
         dc = DistanceCache(dist)
@@ -84,12 +86,12 @@ class TestDistanceCache(TestCase):
         error = "you"
         assertRaisesRegex(self, KeyError, error, dc.distance, "hey", "you")
 
-    def testLowestDistance(self):
+    def testLowestDistance(self) -> None:
         """
         The lowestDistance method must return the lowest distance.
         """
 
-        def dist(a, b):
+        def dist(a: int, b: int) -> int:
             (a, b) = sorted([a, b])
             if (a, b) == (1, 2):
                 return 5
@@ -107,12 +109,12 @@ class TestDistanceCache(TestCase):
 
         self.assertEqual(4, dc.lowestDistance())
 
-    def testPopReturnsLowestDistance(self):
+    def testPopReturnsLowestDistance(self) -> None:
         """
         The pop method must return the lowest distance pair.
         """
 
-        def dist(a, b):
+        def dist(a: int, b: int) -> int:
             (a, b) = sorted([a, b])
             if (a, b) == (1, 2):
                 return 5

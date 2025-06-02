@@ -27,8 +27,9 @@ from midtools.utils import s, baseCountsToStr
 
 # The following import will fail for those that don't have our hbv repo.
 # For now, just let the ImportError happen.
+from pyhbv.paperDieter import GENOTYPE_COLOR
 from pyhbv.genotype import getGenotype, genotypeKey
-from pyhbv.samples import UNKNOWN, sampleIdKey
+from pyhbv.samples import sampleIdKey
 
 
 def plotSAM(
@@ -128,7 +129,7 @@ def plotAllReferencesSAM(
             for id_, length in referenceLengths.items()
         )
         referenceGenotype = dict(
-            (id_, getGenotype(id_) or UNKNOWN) for id_ in referenceLengths
+            (id_, getGenotype(id_) or "UNKNOWN") for id_ in referenceLengths
         )
     else:
         referenceScaleFactor = dict.fromkeys(referenceLengths, 1.0)
@@ -222,21 +223,24 @@ def plotAllReferencesSAM(
     )
     fig = go.Figure(data=data, layout=layout)
 
-    # See "Color Sequences in Plotly Express" at
-    # https://plotly.com/python/discrete-color/ for color sequences.
-    colors = px.colors.qualitative.D3
-    if nGenotypes > len(colors):
-        print(
-            f"WARNING: You have more genotypes ({nGenotypes}) than unique "
-            f"colors ({len(colors)}). Some colors will be repeated.",
-            file=sys.stderr,
-        )
+    if hbv:
+        genotypeColor = GENOTYPE_COLOR
+    else:
+        # See "Color Sequences in Plotly Express" at
+        # https://plotly.com/python/discrete-color/ for color sequences.
+        colors = px.colors.qualitative.D3
+        if nGenotypes > len(colors):
+            print(
+                f"WARNING: You have more genotypes ({nGenotypes}) than unique "
+                f"colors ({len(colors)}). Some colors will be repeated.",
+                file=sys.stderr,
+            )
 
-    genotypeColor = {}
-    iterColors = cycle(colors)
-    for genotype in genotypes:
-        if genotypeCount[genotype]:
-            genotypeColor[genotype] = next(iterColors)
+        genotypeColor = {}
+        iterColors = cycle(colors)
+        for genotype in genotypes:
+            if genotypeCount[genotype]:
+                genotypeColor[genotype] = next(iterColors)
 
     # Put the genotype read count into the legend labels and add the colors.
     fig.for_each_trace(

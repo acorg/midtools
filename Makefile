@@ -1,4 +1,4 @@
-.PHONY: check, tcheck, flake8, wc, clean
+.PHONY: check clean flake8 wc upload
 
 check:
 	pytest
