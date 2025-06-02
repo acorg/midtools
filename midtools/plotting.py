@@ -25,11 +25,28 @@ from midtools.entropy import entropy2, MAX_ENTROPY
 from midtools.match import matchToString
 from midtools.utils import s, baseCountsToStr
 
-# The following import will fail for those that don't have our hbv repo.
-# For now, just let the ImportError happen.
-from pyhbv.paperDieter import GENOTYPE_COLOR
-from pyhbv.genotype import getGenotype, genotypeKey
-from pyhbv.samples import sampleIdKey
+
+try:
+    # This relies on the private Cambridge/Charite HBV repo.
+    from pyhbv.paperDieter import GENOTYPE_COLOR
+    from pyhbv.genotype import getGenotype, genotypeKey
+    from pyhbv.samples import sampleIdKey
+except ImportError:
+    haveHBV = False
+
+    GENOTYPE_COLOR = {}
+
+    def genotypeKey(genotype: str) -> tuple[int, str]:
+        return 0, genotype
+
+    def getGenotype(sample: str, trimSubgenotype: bool = True) -> Optional[str]:
+        return None
+
+    def sampleIdKey(id_: str) -> tuple[str, int, str]:
+        return id_, 0, ""
+else:
+    haveHBV = True
+
 
 
 def plotSAM(
@@ -56,13 +73,13 @@ def plotSAM(
 
     data = []
 
-    count = 0
-    for count, alignment in enumerate(samFilter.alignments(), start=1):
+    for alignment in samFilter.alignments():
         referenceStart = alignment.reference_start
-        score = alignment.get_tag("AS") + (
+        score = float(alignment.get_tag("AS")) + (
             0.0 if jitter == 0.0 else uniform(-jitter, jitter)
         )
         id_ = alignment.query_name
+        assert isinstance(alignment.reference_length, int)
         data.append(
             go.Scatter(
                 x=(referenceStart, referenceStart + alignment.reference_length),
@@ -120,23 +137,29 @@ def plotAllReferencesSAM(
     @param sampleName: The C{str} name of the sample whose reads are being
         analysed.
     """
+    if hbv and not haveHBV:
+        raise ValueError(
+            "You passed a true value for 'hbv' but the pyhbv module could not be "
+            "imported."
+        )
+
     referenceLengths = samFilter.referenceLengths()
     maxReferenceLength = max(referenceLengths.values())
 
     if hbv:
-        referenceScaleFactor = dict(
-            (id_, maxReferenceLength / length)
+        referenceScaleFactor = {
+            id_: maxReferenceLength / length
             for id_, length in referenceLengths.items()
-        )
-        referenceGenotype = dict(
-            (id_, getGenotype(id_) or "UNKNOWN") for id_ in referenceLengths
-        )
+        }
+        referenceGenotype = {
+            id_: (getGenotype(id_) or "UNKNOWN") for id_ in referenceLengths
+        }
     else:
         referenceScaleFactor = dict.fromkeys(referenceLengths, 1.0)
-        referenceGenotype = dict((id_, id_) for id_ in referenceLengths)
+        referenceGenotype = {id_: id_ for id_ in referenceLengths}
 
     genotypes = sorted(set(referenceGenotype.values()), key=genotypeKey)
-    legendRank = dict((genotype, i) for i, genotype in enumerate(genotypes))
+    legendRank = {genotype: i for i, genotype in enumerate(genotypes)}
     nGenotypes = len(genotypes)
     genotypeReferences = defaultdict(set)
 
@@ -144,13 +167,15 @@ def plotAllReferencesSAM(
     inLegend = set()
     genotypeCount: Counter[str] = Counter()
 
-    count = 0
-    for count, alignment in enumerate(samFilter.alignments(), start=1):
+    readCount = 0
+    for readCount, alignment in enumerate(samFilter.alignments(), start=1):
         referenceId = alignment.reference_name
+        assert referenceId
         scaleFactor = referenceScaleFactor[referenceId]
         start = alignment.reference_start
+        assert isinstance(alignment.reference_length, int)
         end = start + alignment.reference_length
-        score = alignment.get_tag("AS") + (
+        score = float(alignment.get_tag("AS")) + (
             0.0 if jitter == 0.0 else uniform(-jitter, jitter)
         )
         genotype = referenceGenotype[referenceId]
@@ -206,7 +231,7 @@ def plotAllReferencesSAM(
 
     title = "<br>".join(
         wrap(
-            f"Best-matched genotypes for {count} reads for {sampleName} "
+            f"Best-matched genotypes for {readCount} reads for {sampleName} "
             f"{sampleGenotypeDesc}from {alignmentFile}.{genotypeReferencesDesc}",
             width=175,
         )
@@ -265,7 +290,7 @@ def _plotSortedMaxBaseFrequencies(
     show: bool,
     titleFontSize: int,
     axisFontSize: int,
-) -> list[list[float], str]:
+) -> list[tuple[float, str]]:
     """
     Plot the sorted maximum base frequency for each of the significant
     offsets.
@@ -354,7 +379,6 @@ def _plotSortedMaxBaseFrequencies(
 def _plotBaseFrequenciesEntropy(
     significantOffsets: list[int],
     baseCountAtOffset: list[Counter[str]],
-    readCountAtOffset: list[int],
     outfile: Path,
     title: str,
     histogram: bool,
@@ -529,7 +553,7 @@ def _plotBaseFrequencies(
     show: bool,
     titleFontSize: int,
     axisFontSize: int,
-    yRange: tuple[int, int],
+    yRange: tuple[float, float],
 ) -> None:
     """
     Plot the (sorted) base frequencies for each of the significant offsets.
@@ -624,6 +648,7 @@ def plotBaseFrequencies(
 
     if sortOn is None:
         title = title or "Base frequencies (sorted)"
+        result = None
         _plotBaseFrequencies(
             significantOffsets,
             baseCountAtOffset,
@@ -654,7 +679,6 @@ def plotBaseFrequencies(
         result = _plotBaseFrequenciesEntropy(
             significantOffsets,
             baseCountAtOffset,
-            readCountAtOffset,
             outfile,
             title + subtitle,
             histogram,
@@ -664,7 +688,8 @@ def plotBaseFrequencies(
         )
 
     if valuesFile:
-        # The following will fail if sortOn is None (no result, above).
+        # Fail if there is no result (because sortOn is None, above).
+        assert result is not None
         with open(valuesFile, "w") as fp:
             dump(
                 {
@@ -819,7 +844,7 @@ def plotConsistentComponents(
             # Get the reference sequence for the component.
             reads = list(
                 FastaReads(
-                    reference.outputDir / ("component-%d-consensuses.fasta" % count)
+                    str(reference.outputDir / f"component-{count}-consensuses.fasta")
                 )
             )
 
@@ -916,7 +941,7 @@ def plotConsistentComponents(
                     % (
                         len(cc.nucleotides),
                         s(len(cc.nucleotides)),
-                        offsetsToLocationsStr(cc.nucleotides),
+                        offsetsToLocationsStr(list(cc.nucleotides)),
                     ),
                     file=fp,
                 )

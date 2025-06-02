@@ -9,8 +9,14 @@ from dark.dna import compareDNAReads
 from dark.process import Executor
 from dark.utils import pct
 
-# This relies on our HBV repo.
-from pyhbv.genotype import getGenotype
+try:
+    # This relies on the private Cambridge/Charite HBV repo.
+    from pyhbv.genotype import getGenotype
+except ImportError:
+    haveHBV = False
+    getGenotype = None
+else:
+    haveHBV = True
 
 from midtools.match import matchToString
 from midtools.reference import (
@@ -189,8 +195,7 @@ class ReadAnalysis:
         self.report("  Writing alignment statistics to", filename)
         e = Executor()
         e.execute(
-            f"sam-reference-read-counts.py {quoted(alignmentFile)} > "
-            f"{quoted(filename)}"
+            f"sam-reference-read-counts.py {quoted(alignmentFile)} > {quoted(filename)}"
         )
         if self.verbose > 1:
             for line in e.log:
@@ -354,19 +359,21 @@ class ReadAnalysis:
                     match = compareDNAReads(referenceRead, consensusRead)["match"]
                     strictCount = match["identicalMatchCount"]
                     nonStrictCount = strictCount + match["ambiguousMatchCount"]
-                    resultSummary.append(
-                        (
-                            strictCount,
-                            nonStrictCount,
-                            "  %-20s\t%-10s\tStrict: %s\tNon-strict: %s"
-                            % (
-                                referenceId,
-                                getGenotype(referenceId),
-                                pct(strictCount, len(referenceRead)),
-                                pct(nonStrictCount, len(referenceRead)),
-                            ),
+                    if haveHBV:
+                        assert getGenotype
+                        summary = "  %-20s\t%-10s\tStrict: %s\tNon-strict: %s" % (
+                            referenceId,
+                            getGenotype(referenceId),
+                            pct(strictCount, len(referenceRead)),
+                            pct(nonStrictCount, len(referenceRead)),
                         )
-                    )
+                    else:
+                        summary = "  %-20s\tStrict: %s\tNon-strict: %s" % (
+                            referenceId,
+                            pct(strictCount, len(referenceRead)),
+                            pct(nonStrictCount, len(referenceRead)),
+                        )
+                    resultSummary.append((strictCount, nonStrictCount, summary))
 
                 # Sort the result summary by decreasing nucleotide identity
                 # fraction. The strict count is first in the tuples we're sorting.
