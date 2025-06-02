@@ -1153,7 +1153,6 @@ class ClusterAnalysis:
         )
 
         plotBaseFrequencies(
-            len(reference.read),
             significantOffsets,
             baseCountAtOffset,
             readCountAtOffset,

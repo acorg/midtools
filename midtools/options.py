@@ -1,4 +1,5 @@
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from typing import Optional
 from argparse import ArgumentParser, Namespace
 
@@ -64,6 +65,10 @@ def addCommandLineOptions(
     )
 
 
+def constructRead(query):
+    return AlignedRead(query.id, query.sequence)
+
+
 def parseCommandLineOptions(
     args: Namespace, returnSignificantOffsets: bool = True
 ) -> tuple[
@@ -109,8 +114,11 @@ def parseCommandLineOptions(
 
     paddedSAM = PaddedSAM(samFilter)
 
-    for query in paddedSAM.queries():
-        alignedReads.append(AlignedRead(query.id, query.sequence))
+    queries = paddedSAM.queries()
+
+    with ProcessPoolExecutor() as executor:
+        for alignedRead in executor.map(constructRead, queries):
+            alignedReads.append(alignedRead)
 
     readCountAtOffset, baseCountAtOffset, readsAtOffset = analyzeOffets(
         genomeLength, alignedReads

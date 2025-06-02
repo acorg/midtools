@@ -390,7 +390,6 @@ class Reference:
             "    Writing reference base frequency plot to", filename
         )
         plotBaseFrequencies(
-            len(self.read),
             self.significantOffsets,
             self.baseCountAtOffset,
             self.readCountAtOffset,
