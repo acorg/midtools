@@ -559,22 +559,28 @@ def _plotBaseFrequencies(
     ]
     layout = go.Layout(
         barmode="stack",
-        title=title,
-        titlefont={
-            "size": titleFontSize,
+        title={
+            "text": title,
+            "font": {
+                "size": titleFontSize,
+            },
         },
         xaxis={
-            "title": "Significant site index",
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Significant site index",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
         },
         yaxis={
-            "title": "Nucleotide frequency",
-            "range": yRange,
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Nucleotide frequency",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": yRange,
         },
     )
 
@@ -583,7 +589,6 @@ def _plotBaseFrequencies(
 
 
 def plotBaseFrequencies(
-    genomeLength: int,
     significantOffsets: list[int],
     baseCountAtOffset: list[Counter[str]],
     readCountAtOffset: list[int],
