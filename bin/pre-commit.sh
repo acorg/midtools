@@ -13,7 +13,7 @@ then
     PATH="$VIRTUAL_ENV/bin:$PATH"
 fi
 
-ruff check
+ruff check --quiet
 
 if [ $? -ne 0 ]
 then
