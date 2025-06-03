@@ -75,6 +75,9 @@ def plotSAM(
 
     for alignment in samFilter.alignments():
         referenceStart = alignment.reference_start
+        # Convert to float here because get_tag will return None if the tag
+        # isn't present. This would cause the code to throw in any case, but
+        # at least with a cast to float pyright doesn't complain.
         score = float(alignment.get_tag("AS")) + (
             0.0 if jitter == 0.0 else uniform(-jitter, jitter)
         )
@@ -147,15 +150,33 @@ def plotAllReferencesSAM(
     maxReferenceLength = max(referenceLengths.values())
 
     if hbv:
+        # Ugly hack alert: If we are showing multiple HBV genomes, because
+        # they have slightly different lengths I decided to scale X axis
+        # positions slightly so that the (scaled) genomes have the same
+        # length and when drawing horizontal lines for matching reads they
+        # would be shown in the "same" place. With HBV genotypes, the maximum
+        # difference between genome lengths is a touch over 2% (from 3182 to
+        # 3248 nt), so this is a very minor visual adjustment. Maybe I
+        # shouldn't have even done it.  And if we don't have HBV samples,
+        # then the scale factor is 1.0 for all sequence ids (the keys of the
+        # referenceLengths dict).
         referenceScaleFactor = {
             id_: maxReferenceLength / length
             for id_, length in referenceLengths.items()
         }
+        # The referenceGenotype dict allows for accounting of HBV sample
+        # genotypes and also the genotype labels in the legend.
         referenceGenotype = {
             id_: (getGenotype(id_) or "UNKNOWN") for id_ in referenceLengths
         }
     else:
+        # Do no scaling of reference lengths.
         referenceScaleFactor = dict.fromkeys(referenceLengths, 1.0)
+        # The referenceGenotype dict here just maps sample ids onto
+        # themselves because we don't have actual genotypes. This variable
+        # could have been better named. And it would have been better to
+        # allow the caller to optionally pass us a sample-id to genotype
+        # mapping.
         referenceGenotype = {id_: id_ for id_ in referenceLengths}
 
     genotypes = sorted(set(referenceGenotype.values()), key=genotypeKey)
@@ -170,11 +191,16 @@ def plotAllReferencesSAM(
     readCount = 0
     for readCount, alignment in enumerate(samFilter.alignments(), start=1):
         referenceId = alignment.reference_name
-        assert referenceId
+        assert referenceId, f"No reference name was present in alignment {alignment!r}."
         scaleFactor = referenceScaleFactor[referenceId]
         start = alignment.reference_start
-        assert isinstance(alignment.reference_length, int)
+        assert isinstance(alignment.reference_length, int), (
+            f"The reference length was not an integer in alignment {alignment!r}."
+        )
         end = start + alignment.reference_length
+        # Convert to float here because get_tag will return None if the tag
+        # isn't present. This would cause the code to throw in any case, but
+        # at least with a cast to float pyright doesn't complain.
         score = float(alignment.get_tag("AS")) + (
             0.0 if jitter == 0.0 else uniform(-jitter, jitter)
         )
@@ -689,7 +715,9 @@ def plotBaseFrequencies(
 
     if valuesFile:
         # Fail if there is no result (because sortOn is None, above).
-        assert result is not None
+        assert result is not None, (
+            f"Logic error! sortOn in theory should be None, but is {sortOn!r}."
+        )
         with open(valuesFile, "w") as fp:
             dump(
                 {
