@@ -21,4 +21,4 @@ wc:
 # twine-pypi').
 upload:
 	python setup.py sdist
-	twine upload dist/midtools-$$(grep __version__ midtools/__init__.py | tr -d "'" | awk '{print $$3}').tar.gz
+	twine upload dist/midtools-$$(grep __version__ midtools/__init__.py | cut -f2 -d'"').tar.gz
