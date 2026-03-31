@@ -19,7 +19,7 @@ from midtools.plotting import plotSAM
 from midtools.plotting import plotCoverageAndSignificantLocations
 from midtools.plotting import plotBaseFrequencies
 from midtools.read import AlignedRead
-from midtools.utils import baseCountsToStr, commas, quoted, s
+from midtools.utils import baseCountsToStr, commas, quoted, s, alignmentQuality
 
 
 def _getAlignedReferenceIds(alignmentFiles: list[Path]) -> set[str]:
@@ -211,7 +211,17 @@ class Reference:
         for query in self.paddedSAM.queries(addAlignment=True):
             assert len(query) == len(self.read)
             self.alignedReads.append(
-                AlignedRead(query.id, query.sequence, query.alignment)
+                AlignedRead(
+                    query.id,
+                    query.sequence,
+                    alignment={
+                        "query_name": query.alignment.query_name,
+                        "query_sequence": query.alignment.query_sequence,
+                        "query_qualities": alignmentQuality(query.alignment),
+                        "is_secondary": query.alignment.is_secondary,
+                        "is_supplementary": query.alignment.is_supplementary,
+                    },
+                )
             )
 
         # Sanity check that all aligned reads have different ids. This

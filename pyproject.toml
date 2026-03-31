@@ -1,0 +1,16 @@
+[project]
+name = "midtools"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "colorlover>=0.3.0",
+    "dark-matter>=7.1.13",
+    "plotly>=6.6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

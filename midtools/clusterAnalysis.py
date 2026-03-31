@@ -18,7 +18,6 @@ from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.read import AlignedRead
 from midtools.reference import Reference
 from midtools.utils import (
-    alignmentQuality,
     baseCountsToStr,
     commas,
     commonest,
@@ -962,13 +961,13 @@ class ClusterAnalysis:
         with open(filename, "w") as fp:
             for wantedCcRead in wantedReads:
                 alignment = wantedCcRead.alignment
-                if not (alignment.is_secondary or alignment.is_supplementary):
+                if not (alignment["is_secondary"] or alignment["is_supplementary"]):
                     wantedCcReadCount += 1
                     print(
                         Read(
-                            alignment.query_name,
-                            alignment.query_sequence,
-                            alignmentQuality(alignment),
+                            alignment["query_name"],
+                            alignment["query_sequence"],
+                            alignment["query_qualities"],
                         ).toString("fastq"),
                         end="",
                         file=fp,
@@ -1037,9 +1036,13 @@ class ClusterAnalysis:
 
                         # If the frequency of the alternate base is high enough, go with
                         # it. Else take the base from the original consensus.
-                        alternateFraction = (
-                            alternateCount / reference.readCountAtOffset[offset]
-                        )
+                        try:
+                            alternateFraction = (
+                                alternateCount / reference.readCountAtOffset[offset]
+                            )
+                        except ZeroDivisionError:
+                            alternateFraction = 0.0
+
                         if (
                             alternateCount > 1
                             and alternateFraction > self.alternateNucleotideMinFreq

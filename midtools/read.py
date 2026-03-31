@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Optional
-from pysam import AlignedSegment
 
 from dark.reads import Read
 
@@ -17,7 +16,7 @@ class AlignedRead(Read):
     """
 
     def __init__(
-        self, id_: str, sequence: str, alignment: Optional[AlignedSegment] = None
+        self, id_: str, sequence: str, alignment: Optional[dict[str, str | bool]] = None
     ) -> None:
         self.significantOffsets: dict[int, str] = {}
         self._originalLength = len(sequence)

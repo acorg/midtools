@@ -1,4 +1,4 @@
-.PHONY: check clean flake8 wc upload
+.PHONY: check clean wc upload
 
 check:
 	pytest
@@ -9,9 +9,6 @@ clean:
 	find . -name '*~' -print0 | xargs -r -0 rm
 	make -C simulations clean
 	find . -type d -name '.*_cache' -print0 | xargs -r -0 rm -r
-
-flake8:
-	find midtools bin -name '*.py' -print0 | xargs -r -0 flake8
 
 wc:
 	find midtools bin \( -name '*.py' -o -name '*.sh' \) -print0 | xargs -r -0 wc -l

@@ -61,6 +61,5 @@ setup(
     install_requires=[
         "dark-matter>=4.0.6",
         "plotly>=2.7.0",
-        "flake8>=3.5.0",
     ],
 )

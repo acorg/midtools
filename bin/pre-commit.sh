@@ -21,10 +21,10 @@ then
     exit 1
 fi
 
-make check
+pytest
 
 if [ $? -ne 0 ]
 then
-    echo "COMMIT FAILED: 'make check' did not run cleanly:" >&2
+    echo "COMMIT FAILED: pytest did not run cleanly:" >&2
     exit 1
 fi

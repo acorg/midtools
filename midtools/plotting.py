@@ -95,26 +95,32 @@ def plotSAM(
         )
 
     xaxis = {
-        "title": "Genome location",
         "range": (0, referenceLength),
-        "titlefont": {
-            "size": axisFontSize,
+        "title": {
+            "text": "Genome location",
+            "font": {
+                "size": axisFontSize,
+            },
         },
     }
 
     yaxis = {
-        "title": "Alignment score",
-        "titlefont": {
-            "size": axisFontSize,
+        "title": {
+            "text": "Alignment score",
+            "font": {
+                "size": axisFontSize,
+            },
         },
     }
 
     layout = go.Layout(
-        title=title,
         xaxis=xaxis,
         yaxis=yaxis,
-        titlefont={
-            "size": titleFontSize,
+        title={
+            "text": title,
+            "font": {
+                "size": titleFontSize,
+            },
         },
         hovermode="closest",
     )
@@ -224,17 +230,21 @@ def plotAllReferencesSAM(
         inLegend.add(genotype)
 
     xaxis = {
-        "title": "HBV genome location (scaled)" if hbv else "Genome location",
-        "range": (0, maxReferenceLength),
-        "titlefont": {
-            "size": axisFontSize,
+        "title": {
+            "text": "HBV genome location (scaled)" if hbv else "Genome location",
+            "font": {
+                "size": axisFontSize,
+            },
         },
+        "range": (0, maxReferenceLength),
     }
 
     yaxis = {
-        "title": "Bowtie2 alignment score",
-        "titlefont": {
-            "size": axisFontSize,
+        "title": {
+            "text": "Bowtie2 alignment score",
+            "font": {
+                "size": axisFontSize,
+            },
         },
     }
 
@@ -264,11 +274,13 @@ def plotAllReferencesSAM(
     )
 
     layout = go.Layout(
-        title=title,
         xaxis=xaxis,
         yaxis=yaxis,
-        titlefont={
-            "size": titleFontSize,
+        title={
+            "text": title,
+            "font": {
+                "size": titleFontSize,
+            },
         },
         hovermode="closest",
     )
@@ -347,19 +359,23 @@ def _plotSortedMaxBaseFrequencies(
         ]
 
         xaxis = {
-            "title": "Significant site maximum nucleotide frequency",
-            "range": (-0.05, 1.05),
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Significant site maximum nucleotide frequency",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (-0.05, 1.05),
         }
 
         yaxis = {
-            "title": "Probability mass",
-            "range": (0.0, 1.0),
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Probability mass",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (0.0, 1.0),
         }
     else:
         data = [
@@ -374,27 +390,33 @@ def _plotSortedMaxBaseFrequencies(
 
         xmargin = max(1, int(len(significantOffsets) * 0.01))
         xaxis = {
-            "title": "Rank",
-            "range": (-xmargin, len(significantOffsets) + xmargin),
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Rank",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (-xmargin, len(significantOffsets) + xmargin),
         }
 
         yaxis = {
-            "range": (0.0, 1.05),
-            "title": "Significant site maximum nucleotide frequency",
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Significant site maximum nucleotide frequency",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (0.0, 1.05),
         }
 
     layout = go.Layout(
-        title=title,
         xaxis=xaxis,
         yaxis=yaxis,
-        titlefont={
-            "size": titleFontSize,
+        title={
+            "text": title,
+            "font": {
+                "size": titleFontSize,
+            },
         },
     )
     fig = go.Figure(data=data, layout=layout)
@@ -436,19 +458,23 @@ def _plotBaseFrequenciesEntropy(
         data = [go.Histogram(x=values, histnorm="probability")]
 
         xaxis = {
-            "title": ("Significant site nucleotide frequency entropy (bits)"),
-            "range": (-0.05, MAX_ENTROPY),
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": ("Significant site nucleotide frequency entropy (bits)"),
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (-0.05, MAX_ENTROPY),
         }
 
         yaxis = {
-            "title": "Probability mass",
-            "range": (0.0, 1.0),
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Probability mass",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (0.0, 1.0),
         }
     else:
         data = [
@@ -463,27 +489,33 @@ def _plotBaseFrequenciesEntropy(
 
         xmargin = max(1, int(len(significantOffsets) * 0.01))
         xaxis = {
-            "range": (-xmargin, len(significantOffsets) + xmargin),
-            "title": "Rank",
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Rank",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (-xmargin, len(significantOffsets) + xmargin),
         }
 
         yaxis = {
-            "range": (-0.05, MAX_ENTROPY),
-            "title": ("Significant site nucleotide frequency entropy (bits)"),
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": ("Significant site nucleotide frequency entropy (bits)"),
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (-0.05, MAX_ENTROPY),
         }
 
     layout = go.Layout(
-        title=title,
         xaxis=xaxis,
         yaxis=yaxis,
-        titlefont={
-            "size": titleFontSize,
+        title={
+            "text": title,
+            "font": {
+                "size": titleFontSize,
+            },
         },
     )
     fig = go.Figure(data=data, layout=layout)
@@ -547,22 +579,28 @@ def _plotBaseFrequenciesAllOffsets(
     ]
     layout = go.Layout(
         barmode="stack",
-        title=title,
-        titlefont={
-            "size": titleFontSize,
+        title={
+            "text": title,
+            "font": {
+                "size": titleFontSize,
+            },
         },
         xaxis={
-            "title": "Significant site index",
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Significant site index",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
         },
         yaxis={
-            "title": "Nucleotide frequency",
-            "range": yRange,
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Nucleotide frequency",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": yRange,
         },
     )
 
@@ -1062,24 +1100,30 @@ def plotConsistentComponents(
     )
 
     layout = go.Layout(
-        title=title,
-        titlefont={
-            "size": titleFontSize,
+        title={
+            "text": title,
+            "font": {
+                "size": titleFontSize,
+            },
         },
         xaxis={
-            "range": (0, len(reference.read) + 1),
-            "title": "Genome location",
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Genome location",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (0, len(reference.read) + 1),
             "showgrid": False,
         },
         yaxis={
-            "range": (-0.1, 1.1),
-            "title": "Nucleotide identity with reference sequence",
-            "titlefont": {
-                "size": axisFontSize,
+            "title": {
+                "text": "Nucleotide identity with reference sequence",
+                "font": {
+                    "size": axisFontSize,
+                },
             },
+            "range": (-0.1, 1.1),
         },
         hovermode="closest",
     )
