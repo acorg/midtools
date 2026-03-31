@@ -10,6 +10,9 @@ clean:
 	make -C simulations clean
 	find . -type d -name '.*_cache' -print0 | xargs -r -0 rm -r
 
+nox:
+	uv run noxfile.py
+
 wc:
 	find midtools bin \( -name '*.py' -o -name '*.sh' \) -print0 | xargs -r -0 wc -l
 

@@ -12,3 +12,4 @@ simulations/**/*.fasta
 simulations/**/*.fastq
 simulations/**/*.locations
 simulations/**/LOG
+build

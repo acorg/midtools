@@ -1,16 +1,60 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "midtools"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.2.0"
+description = "Command line scripts and Python classes for detecting multiple infections from NGS reads."
 readme = "README.md"
-requires-python = ">=3.13"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    {name = "Terry Jones", email = "tcj25@cam.ac.uk"},
+]
+keywords = ["genetic sequences"]
+classifiers = [
+    "Programming Language :: Python :: 2.7",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "colorlover>=0.3.0",
     "dark-matter>=7.1.13",
     "plotly>=6.6.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/acorg/midtools"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+script-files = [
+    "bin/base-frequencies.py",
+    "bin/connected-components.py",
+    "bin/consistency-basic.py",
+    "bin/consistency-heatmap.py",
+    "bin/coverage-and-significant-locations.py",
+    "bin/create-mid-experiment-data.py",
+    "bin/create-reads.py",
+    "bin/multiple-significant-base-frequencies.py",
+    "bin/mutate-reads.py",
+    "bin/random-nt-sequence.py",
+    "bin/significant-base-frequencies.py",
+    "bin/simulation-significant-base-frequencies.sh",
+]
+
 [dependency-groups]
 dev = [
+    "nox>=2026.2.9",
     "pytest>=9.0.2",
 ]
