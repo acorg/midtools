@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "midtools"
-version = "1.2.0"
+version = "1.2.1"
 description = "Command line scripts and Python classes for detecting multiple infections from NGS reads."
 readme = "README.md"
 license = "MIT"
@@ -46,8 +46,10 @@ script-files = [
     "bin/coverage-and-significant-locations.py",
     "bin/create-mid-experiment-data.py",
     "bin/create-reads.py",
+    "bin/mid-cluster.py",
     "bin/multiple-significant-base-frequencies.py",
     "bin/mutate-reads.py",
+    "bin/plot-reads-against-all-references.py",
     "bin/random-nt-sequence.py",
     "bin/significant-base-frequencies.py",
     "bin/simulation-significant-base-frequencies.sh",
