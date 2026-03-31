@@ -14,11 +14,9 @@ nox:
 	uv run noxfile.py
 
 wc:
-	find midtools bin \( -name '*.py' -o -name '*.sh' \) -print0 | xargs -r -0 wc -l
+	find src/midtools bin \( -name '*.py' -o -name '*.sh' \) -print0 | xargs -r -0 wc -l
 
-# The upload target requires that you have access rights to PYPI. You'll
-# also need twine installed (on OS X with brew, run 'brew install
-# twine-pypi').
+# The upload target requires that you have access rights to PYPI.
 upload:
-	python setup.py sdist
-	twine upload dist/midtools-$$(grep __version__ midtools/__init__.py | cut -f2 -d'"').tar.gz
+	uv build
+	uvx twine upload dist/midtools-$$(grep '^version' pyproject.toml | cut -f2 -d'"').tar.gz
