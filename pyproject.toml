@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "midtools"
-version = "1.2.1"
+version = "1.2.2"
 description = "Command line scripts and Python classes for detecting multiple infections from NGS reads."
 readme = "README.md"
 license = "MIT"
@@ -27,7 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "colorlover>=0.3.0",
-    "dark-matter>=7.1.13",
+    "dark-matter>=7.1.18",
     "plotly>=6.6.0",
 ]
 
