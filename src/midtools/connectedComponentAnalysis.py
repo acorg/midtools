@@ -9,7 +9,7 @@ from dark.fasta import FastaReads
 from dark.sam import samfile
 
 from midtools.analysis import ReadAnalysis
-from midtools.offsets import analyzeOffets, findSignificantOffsets
+from midtools.offsets import analyzeOffsets, findSignificantOffsets
 from midtools.match import matchToString
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.utils import (
@@ -107,8 +107,7 @@ class ConsistentComponent:
                     self.nucleotides[offset],
                     referenceBase,
                     infoFp,
-                    "WARNING: consensus draw at offset %d" % offset
-                    + " %(baseCounts)s.",
+                    f"WARNING: consensus draw at offset {offset} %(baseCounts)s.",
                 )
             else:
                 base = "-"
@@ -323,9 +322,10 @@ class ComponentByOffsets:
                 "      Saving component %d consensus info to %s"
                 % (count, consensusFilename, count, infoFilename)
             )
-        with open(consensusFilename, "w") as consensusFp, open(
-            infoFilename, "w"
-        ) as infoFp:
+        with (
+            open(consensusFilename, "w") as consensusFp,
+            open(infoFilename, "w") as infoFp,
+        ):
             # First write the reference sequence for this component.
             (reference,) = list(
                 FastaReads(join(outputDir, "reference-component-%d.fasta" % count))
@@ -804,8 +804,8 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                         bestCc.nucleotides[offset],
                         referenceBase,
                         infoFp,
-                        ("      WARNING: base count draw at offset %d " % offset)
-                        + " %(baseCounts)s.",
+                        f"      WARNING: base count draw at offset {offset} "
+                        "%(baseCounts)s.",
                     )
                     consensus[offset] = base
                     offsetsDone.add(offset)
@@ -864,7 +864,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                 consensusReadCountAtOffset,
                 consensusWantedReadsBaseCountAtOffset,
                 _,
-            ) = analyzeOffets(genomeLength, set(alignedReads) - unwantedCcReads)
+            ) = analyzeOffsets(genomeLength, set(alignedReads) - unwantedCcReads)
 
             depthFile = join(outputDir, "consensus-depth.txt")
             self.report("    Writing consensus depth information to", depthFile)
@@ -891,11 +891,8 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                         baseCount,
                         referenceBase,
                         infoFp,
-                        (
-                            "    WARNING: consensus base count draw at "
-                            "offset %d" % offset
-                        )
-                        + " %(baseCounts)s.",
+                        f"    WARNING: consensus base count draw at offset {offset} "
+                        "%(baseCounts)s.",
                     )
                     print(
                         "  Offset %d: %s from nucleotides %s"
@@ -934,11 +931,8 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                         baseCount,
                         referenceBase,
                         infoFp,
-                        (
-                            "    WARNING: consensus base count draw at "
-                            "offset %d" % offset
-                        )
-                        + " %(baseCounts)s.",
+                        f"    WARNING: consensus base count draw at offset {offset} "
+                        "%(baseCounts)s.",
                     )
                     print(
                         "  Offset %d: %s from nucleotides %s"
@@ -1258,8 +1252,8 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                         bestCc.nucleotides[offset],
                         referenceBase,
                         infoFp,
-                        ("    WARNING: base count draw at offset %d " % offset)
-                        + " %(baseCounts)s.",
+                        f"    WARNING: base count draw at offset {offset} "
+                        "%(baseCounts)s.",
                     )
                     if base == referenceBase:
                         mismatch = ""
@@ -1268,11 +1262,8 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                             baseCountAtOffset[offset],
                             referenceBase,
                             infoFp,
-                            (
-                                "    WARNING: consensus base count draw at "
-                                "offset %d " % offset
-                            )
-                            + " %(baseCounts)s.",
+                            f"    WARNING: consensus base count draw at offset {offset} "
+                            "%(baseCounts)s.",
                         )
                         mismatch = (
                             " (mismatch: reference has %s, all-read "
@@ -1313,7 +1304,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             # aligned reads minus the reads we don't want because they're
             # in a consistent component that is not the best for this
             # non-reference sequence.
-            consensusReadCountAtOffset, wantedReadBaseCountAtOffset, _ = analyzeOffets(
+            consensusReadCountAtOffset, wantedReadBaseCountAtOffset, _ = analyzeOffsets(
                 genomeLength, set(alignedReads) - unwantedCcReads
             )
 
@@ -1344,11 +1335,8 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                         baseCount,
                         referenceBase,
                         infoFp,
-                        (
-                            "    WARNING: consensus base count draw at "
-                            "offset %d" % offset
-                        )
-                        + " %(baseCounts)s.",
+                        f"    WARNING: consensus base count draw at offset {offset} "
+                        "%(baseCounts)s.",
                     )
                     print(
                         "  Offset %d: %s from nucleotides %s"
@@ -1387,11 +1375,8 @@ class ConnectedComponentAnalysis(ReadAnalysis):
                         baseCount,
                         referenceBase,
                         infoFp,
-                        (
-                            "    WARNING: consensus base count draw at "
-                            "offset %d" % offset
-                        )
-                        + " %(baseCounts)s.",
+                        f"    WARNING: consensus base count draw at offset {offset} "
+                        "%(baseCounts)s.",
                     )
                     print(
                         "  Offset %d: %s from nucleotides %s"

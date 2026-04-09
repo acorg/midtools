@@ -14,10 +14,12 @@ from dark.utils import pct
 if TYPE_CHECKING:
     from midtools.analysis import ReadAnalysis
 
-from midtools.offsets import analyzeOffets, findSignificantOffsets
-from midtools.plotting import plotSAM
-from midtools.plotting import plotCoverageAndSignificantLocations
-from midtools.plotting import plotBaseFrequencies
+from midtools.offsets import analyzeOffsets, findSignificantOffsets
+from midtools.plotting import (
+    plotSAM,
+    plotCoverageAndSignificantLocations,
+    plotBaseFrequencies,
+)
 from midtools.read import AlignedRead
 from midtools.utils import baseCountsToStr, commas, quoted, s, alignmentQuality
 
@@ -236,10 +238,7 @@ class Reference:
                 f"{str(filename)!r}"
             )
             plotSAM(
-                SAMFilter(
-                    self.alignmentFile,
-                    referenceIds={self.id},
-                ),
+                SAMFilter(self.alignmentFile, referenceIds={self.id}),
                 filename,
                 title=f"Mapping {self.readAnalysis.sampleName} reads against {self.id}",
                 jitter=0.45,
@@ -249,7 +248,7 @@ class Reference:
             self.readCountAtOffset,
             self.baseCountAtOffset,
             self.readsAtOffset,
-        ) = analyzeOffets(len(self.read), self.alignedReads)
+        ) = analyzeOffsets(len(self.read), self.alignedReads)
 
         self.significantOffsets = list(
             findSignificantOffsets(

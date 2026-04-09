@@ -5,7 +5,7 @@ from argparse import ArgumentParser, Namespace
 
 from dark.sam import SAMFilter, PaddedSAM
 
-from midtools.offsets import analyzeOffets, findSignificantOffsets
+from midtools.offsets import analyzeOffsets, findSignificantOffsets
 from midtools.read import AlignedRead
 
 
@@ -120,7 +120,7 @@ def parseCommandLineOptions(
         for alignedRead in executor.map(constructRead, queries):
             alignedReads.append(alignedRead)
 
-    readCountAtOffset, baseCountAtOffset, readsAtOffset = analyzeOffets(
+    readCountAtOffset, baseCountAtOffset, readsAtOffset = analyzeOffsets(
         genomeLength, alignedReads
     )
 
@@ -227,5 +227,5 @@ def addAnalysisCommandLineOptions(parser: ArgumentParser) -> None:
         "--verbose",
         type=int,
         default=0,
-        help=("The integer verbosity level (0 = no output, 1 = some output, etc)."),
+        help="The integer verbosity level (0 = no output, 1 = some output, etc).",
     )

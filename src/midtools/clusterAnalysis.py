@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from midtools.analysis import ReadAnalysis
 from midtools.clusters import ReadCluster, ReadClusters
 from midtools.match import matchToString
-from midtools.offsets import analyzeOffets, findSignificantOffsets, OffsetBases
+from midtools.offsets import analyzeOffsets, findSignificantOffsets, OffsetBases
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.read import AlignedRead
 from midtools.reference import Reference
@@ -349,9 +349,10 @@ class Component:
                 "      Saving component %d consensus info to %s"
                 % (count, consensusFilename, count, infoFilename)
             )
-        with open(consensusFilename, "w") as consensusFp, open(
-            infoFilename, "w"
-        ) as infoFp:
+        with (
+            open(consensusFilename, "w") as consensusFp,
+            open(infoFilename, "w") as infoFp,
+        ):
             # First write the reference sequence for this component.
             (reference,) = list(
                 FastaReads(outputDir / ("reference-component-%d.fasta" % count))
@@ -481,7 +482,7 @@ class ClusterAnalysis:
 
     def analyzeReference(self, reference: Reference) -> None:
         """
-        Analyze a reference.
+        Analyze a reference. This is called by the read analysis.
 
         @param reference: A C{Reference} instance to analyze.
         """
@@ -517,10 +518,9 @@ class ClusterAnalysis:
         Find all connected components.
 
         @param reference: A C{Reference} instance to analyze.
-        @return: A C{list} of C{Component} instances,
-            sorted by component (the smallest offset is used for sorting
-            so this gives the components from left to right along the
-            reference genome.
+        @return: A C{list} of C{Component} instances, sorted by component. The smallest
+            offset is used for sorting, which arranges the components from left to right
+            along the reference genome.
         """
         significantReads = set(
             read for read in reference.alignedReads if read.significantOffsets
@@ -696,7 +696,7 @@ class ClusterAnalysis:
             return result
 
         def partitionCcs(
-            scoredCcs: list[tuple[float, int, ConsistentComponent]]
+            scoredCcs: list[tuple[float, int, ConsistentComponent]],
         ) -> tuple[
             set[tuple[int, ConsistentComponent]], set[tuple[int, ConsistentComponent]]
         ]:
@@ -809,8 +809,10 @@ class ClusterAnalysis:
 
             # Get the base counts at each offset, from the full set of reads minus those
             # we're not using.
-            (wantedReadsCountAtOffset, wantedReadsBaseCountAtOffset, _) = analyzeOffets(
-                referenceLength, set(reference.alignedReads) - unwantedReads
+            (wantedReadsCountAtOffset, wantedReadsBaseCountAtOffset, _) = (
+                analyzeOffsets(
+                    referenceLength, set(reference.alignedReads) - unwantedReads
+                )
             )
             remainingOffsets = sorted(set(range(referenceLength)) - offsetsDone)
 

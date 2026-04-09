@@ -3,7 +3,7 @@ from os import unlink
 from pathlib import Path
 from itertools import chain
 from collections import defaultdict
-from typing import Optional, Callable
+from typing import Callable
 
 from dark.dna import compareDNAReads
 from dark.process import Executor
@@ -71,7 +71,7 @@ class ReadAnalysis:
         alignmentFiles: list[str],
         referenceGenomeFiles: list[str],
         outputDir: str,
-        referenceIds: Optional[list[str]] = None,
+        referenceIds: list[str] | None = None,
         minReads: int = DEFAULT_MIN_READS,
         homogeneousCutoff: float = DEFAULT_HOMOGENEOUS_CUTOFF,
         plotSAM: bool = False,

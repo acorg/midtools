@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor
 from typing import Iterator, Optional
 
 from midtools.read import AlignedRead
@@ -161,48 +160,36 @@ class OffsetBases:
             return orderedCounts[0][1] / orderedCounts[1][1]
 
 
-def analyzeOffets(
+def analyzeOffsets(
     genomeLength: int, alignedReads: list[AlignedRead]
 ) -> tuple[list[int], list[Counter[str]], list[set[AlignedRead]]]:
     """
     Analyze the aligned reads.
 
-    @param genomeLength: The C{int} length of the genome the reads were
-        aligned to.
+    @param genomeLength: The C{int} length of the genome the reads were aligned to.
     @param alignedReads: A C{list} of C{AlignedRead} instances.
     @return: A tuple of C{list}s (readCountAtOffset, baseCountAtOffset,
         readsAtOffset), each indexed from zero to the genome length.
     """
-    readCountAtOffset = dict()
-    baseCountAtOffset = dict()
-    readsAtOffset = dict()
+    readCountAtOffset = []
+    baseCountAtOffset = []
+    readsAtOffset = []
 
-    offsets = list(range(genomeLength))
-    with ProcessPoolExecutor() as executor:
-        for offset, (reads, counts) in zip(
-            offsets, executor.map(processOffset, alignedReads, offsets)
-        ):
-            baseCountAtOffset[offset] = counts
-            readCountAtOffset[offset] = sum(counts.values())
-            readsAtOffset[offset] = reads
-
-    return (
-        [x for _, x in sorted(readCountAtOffset.items())],
-        [x for _, x in sorted(baseCountAtOffset.items())],
-        [x for _, x in sorted(readsAtOffset.items())],
-    )
-
-
-def processOffset(alignedReads, offset):
     nucleotides = set("ACGT")
-    reads = set()
-    counts: Counter[str] = Counter({n: 0 for n in nucleotides})
-    for read in alignedReads:
-        base = read.base(offset)
-        if base in nucleotides:
-            counts[base] += 1
-            reads.add(read)
-    return reads, counts
+
+    for offset in range(genomeLength):
+        reads = set()
+        counts: Counter[str] = Counter()
+        for read in alignedReads:
+            base = read.base(offset)
+            if base in nucleotides:
+                counts[base] += 1
+                reads.add(read)
+        baseCountAtOffset.append(counts)
+        readCountAtOffset.append(sum(counts.values()))
+        readsAtOffset.append(reads)
+
+    return readCountAtOffset, baseCountAtOffset, readsAtOffset
 
 
 def findSignificantOffsets(

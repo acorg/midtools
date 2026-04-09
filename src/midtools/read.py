@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from dark.reads import Read
 
 
@@ -16,7 +14,7 @@ class AlignedRead(Read):
     """
 
     def __init__(
-        self, id_: str, sequence: str, alignment: Optional[dict[str, str | bool]] = None
+        self, id_: str, sequence: str, alignment: dict[str, str | bool] | None = None
     ) -> None:
         self.significantOffsets: dict[int, str] = {}
         self._originalLength = len(sequence)
@@ -119,7 +117,7 @@ class AlignedRead(Read):
                 newSignificantOffsets[offset] = base
         self.significantOffsets = newSignificantOffsets
 
-    def base(self, n: int) -> Optional[str]:
+    def base(self, n: int) -> str | None:
         """
         Get the nucleotide base at a given offset.
 

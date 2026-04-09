@@ -60,7 +60,7 @@ if __name__ == "__main__":
         help=(
             "The approach to use when making a consensus if there are no reads "
             "covering a site. A value of 'N' means to use an ambigous N nucleotide "
-            "code, whereas a value fo 'reference' means to take the base from the "
+            "code, whereas a value of 'reference' means to take the base from the "
             "reference sequence."
         ),
     )
@@ -70,6 +70,27 @@ if __name__ == "__main__":
     referenceIds = (
         list(chain.from_iterable(args.referenceId)) if args.referenceId else None
     )
+
+    # The logic of the below is a little hard to follow. There are three steps:
+    #
+    # 1. Make a read analysis with a 'run' method (which we don't call yet).
+    #
+    # 2. Set up a Cluster Analysis, giving it the read analysis (so the running cluster
+    #    analysis can get some parameters and produce reporting information when the
+    #    read analysis is run.
+    #
+    # 3. Call the read analysis 'run' method (see 1 above), passing it the function from
+    #    the cluster analysis that can analyze a reference.
+    #
+    # Things are done in this (seemingly?) convoluted way because I implemented several
+    # methods for doing the main work, of which the cluster analysis is just one. They
+    # all needed to work in the same way, and so I separated the organizational things
+    # (like making output directories and collecting final / overall results) into the
+    # common read analysis class, and the code that does the actual analysis for an
+    # input alignment file / reference pair. If you look at the 'run' method of the
+    # ReadAnalysis class you'll see it's basically just a loop over alignment file /
+    # reference pairs, each with some setup and then calling the cluster analysis
+    # function. Then some final gathering of overall results.
 
     analysis = ReadAnalysis(
         args.sampleName,
