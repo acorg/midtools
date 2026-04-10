@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "midtools"
-version = "1.2.2"
+version = "1.2.3"
 description = "Command line scripts and Python classes for detecting multiple infections from NGS reads."
 readme = "README.md"
 license = "MIT"
