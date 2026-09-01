@@ -27,8 +27,8 @@ classifiers = [
 ]
 dependencies = [
     "colorlover>=0.3.0",
-    "dark-matter>=7.1.18",
-    "plotly>=6.6.0",
+    "dark-matter~=7.1.18",
+    "plotly~=6.6.0",
 ]
 
 [project.urls]
