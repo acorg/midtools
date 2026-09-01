@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from math import log
-from typing import Iterable
 
 from sklearn.utils._array_api import (
     _max_precision_float_dtype,

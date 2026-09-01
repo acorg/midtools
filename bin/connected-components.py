@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from itertools import chain
+
 from midtools.connectedComponentAnalysis import ConnectedComponentAnalysis
 from midtools.options import addAnalysisCommandLineOptions
-
 
 if __name__ == "__main__":
     import argparse

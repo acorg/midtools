@@ -1,7 +1,7 @@
+from collections.abc import Iterable
+
 from sklearn.metrics import mutual_info_score
 from sklearn.metrics.cluster import entropy
-
-from typing import Iterable
 
 # from numpy import seterr
 # seterr(divide='raise')

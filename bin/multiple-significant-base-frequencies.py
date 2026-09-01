@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
+from json import load
+
 import plotly
 import plotly.graph_objs as go
-from json import load
 
 
 def sampleIdKey(id_):
@@ -54,8 +55,7 @@ def plotScores(sampleData, outfile):
     for sampleName in sorted(sampleData, key=sampleIdKey):
         values = sampleData[sampleName]["values"]
         length = len(values)
-        if length > maxLength:
-            maxLength = length
+        maxLength = max(maxLength, length)
         initialZeroCount = 0
         for value in values:
             if value == 0:

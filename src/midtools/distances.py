@@ -1,5 +1,6 @@
-from typing import Any, Callable, Optional
 from collections import defaultdict
+from collections.abc import Callable
+from typing import Any
 
 from midtools.pqueue import PriorityQueue
 
@@ -51,7 +52,7 @@ class DistanceCache:
             # will be found when subsequent elements are added.
             self._distances[a]
 
-    def lowestDistance(self) -> Optional[float]:
+    def lowestDistance(self) -> float | None:
         """
         Get the lowest distance between any two clusters.
 

@@ -2,8 +2,8 @@
 
 import argparse
 import sys
-from random import choice
 from pathlib import Path
+from random import choice
 
 from dark.fasta import FastaReads
 from dark.process import Executor

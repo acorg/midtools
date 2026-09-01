@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 from midtools.read import AlignedRead
 
@@ -13,7 +13,7 @@ class OffsetBases:
 
     def __init__(self) -> None:
         self._counts: Counter[str] = Counter()
-        self._commonest: Optional[set[str]] = None
+        self._commonest: set[str] | None = None
         self._clean = True
 
     def __eq__(self, other: object) -> bool:
@@ -55,7 +55,7 @@ class OffsetBases:
         self._clean = False
 
     @property
-    def commonest(self) -> Optional[set[str]]:
+    def commonest(self) -> set[str] | None:
         """
         Find the commonest bases.
 
@@ -140,7 +140,7 @@ class OffsetBases:
         return 1.0 - max(((aCounts[base] + bCounts[base]) / denom) for base in allBases)
 
     @staticmethod
-    def highestFrequenciesMultiple(a: OffsetBases, b: OffsetBases) -> Optional[float]:
+    def highestFrequenciesMultiple(a: OffsetBases, b: OffsetBases) -> float | None:
         """
         How much does the most frequent nucleotide occur more than the second
         most?

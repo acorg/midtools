@@ -1,25 +1,24 @@
+from collections import Counter, defaultdict
 from os.path import join
-from collections import defaultdict, Counter
-
-from pysam import AlignmentFile
 
 from dark.dna import compareDNAReads
-from dark.reads import Read, Reads
 from dark.fasta import FastaReads
+from dark.reads import Read, Reads
 from dark.sam import samfile
+from pysam import AlignmentFile
 
 from midtools.analysis import ReadAnalysis
-from midtools.offsets import analyzeOffsets, findSignificantOffsets
 from midtools.match import matchToString
+from midtools.offsets import analyzeOffsets, findSignificantOffsets
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.utils import (
+    alignmentQuality,
     baseCountsToStr,
-    nucleotidesToStr,
+    commas,
     commonest,
     fastaIdentityTable,
+    nucleotidesToStr,
     s,
-    commas,
-    alignmentQuality,
 )
 
 
@@ -37,7 +36,7 @@ def connectedComponentsByOffset(significantReads, threshold):
     @return: A generator that yields C{ComponentByOffsets} instances.
     """
     while significantReads:
-        element = sorted(significantReads)[0]
+        element = min(significantReads)
         significantReads.remove(element)
         component = {element}
         offsets = set(element.significantOffsets)
@@ -446,9 +445,9 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             (
                 genomeLength,
                 alignedReads,
-                readCountAtOffset,
+                _,
                 baseCountAtOffset,
-                readsAtOffset,
+                _,
                 significantOffsets,
                 samFilter,
                 paddedSAM,
@@ -867,7 +866,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             ) = analyzeOffsets(genomeLength, set(alignedReads) - unwantedCcReads)
 
             depthFile = join(outputDir, "consensus-depth.txt")
-            self.report("    Writing consensus depth information to", depthFile)
+            self.report("    Saving consensus depth information to", depthFile)
             with open(depthFile, "w") as depthFp:
                 for offset in range(genomeLength):
                     print(offset + 1, consensusReadCountAtOffset[offset], file=depthFp)
@@ -1310,7 +1309,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
 
             depthFile = join(outputDir, "non-reference-consensus-depth.txt")
             self.report(
-                "    Writing non-reference consensus depth information to", depthFile
+                "    Saving non-reference consensus depth information to", depthFile
             )
             with open(depthFile, "w") as depthFp:
                 for offset in range(genomeLength):
@@ -1453,7 +1452,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         @param outputDir: A C{str} directory path.
         """
         filename = join(outputDir, "reference-consensus.sam")
-        self.report("    Writing consensus SAM to", filename)
+        self.report("    Saving consensus SAM to", filename)
         with samfile(alignmentFile) as sam:
             alignment = AlignmentFile(filename, mode="w", template=sam)
         save = alignment.write
@@ -1477,7 +1476,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         @param outputDir: A C{str} directory path.
         """
         filename = join(outputDir, "consensus-base-frequencies.html")
-        self.report("    Writing consensus base frequency plot to", filename)
+        self.report("    Saving consensus base frequency plot to", filename)
 
         significantOffsets = list(
             findSignificantOffsets(
@@ -1536,7 +1535,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
         @param outputDir: A C{str} directory path.
         """
         filename = join(outputDir, "component-summary.txt")
-        self.report("    Writing analysis summary to", filename)
+        self.report("    Saving analysis summary to", filename)
         reference = self.referenceGenomes[referenceId]
 
         with open(filename, "w") as fp:
@@ -1555,7 +1554,7 @@ class ConnectedComponentAnalysis(ReadAnalysis):
             totalReads = 0
             for count, component in enumerate(components, start=1):
                 filename = join(outputDir, "component-%d.txt" % count)
-                self.report("    Writing component %d summary to" % count, filename)
+                self.report("    Saving component %d summary to" % count, filename)
                 with open(filename, "w") as fp2:
                     component.summarize(fp2, count, reference.sequence)
 

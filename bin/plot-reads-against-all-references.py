@@ -3,6 +3,7 @@
 import argparse
 
 from dark.sam import SAMFilter
+
 from midtools.plotting import plotAllReferencesSAM
 
 

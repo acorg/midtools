@@ -3,7 +3,6 @@
 from midtools.options import addCommandLineOptions, parseCommandLineOptions
 from midtools.plotting import plotCoverageAndSignificantLocations
 
-
 if __name__ == "__main__":
     import argparse
 

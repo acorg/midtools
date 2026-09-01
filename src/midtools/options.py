@@ -1,9 +1,8 @@
+from argparse import ArgumentParser, Namespace
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
-from typing import Optional
-from argparse import ArgumentParser, Namespace
 
-from dark.sam import SAMFilter, PaddedSAM
+from dark.sam import PaddedSAM, SAMFilter
 
 from midtools.offsets import analyzeOffsets, findSignificantOffsets
 from midtools.read import AlignedRead
@@ -39,7 +38,7 @@ def addCommonOptions(parser: ArgumentParser) -> None:
 
 
 def addCommandLineOptions(
-    parser: ArgumentParser, outfileDefaultName: Optional[str] = None
+    parser: ArgumentParser, outfileDefaultName: str | None = None
 ):
     """
     Add standard command-line options to an argument parser.
@@ -78,7 +77,7 @@ def parseCommandLineOptions(
     list[int],
     list[Counter],
     list[set[AlignedRead]],
-    Optional[list[int]],
+    list[int] | None,
 ]:
     """
     Deal with the various command-line options added to the ArgumentParser
@@ -104,7 +103,7 @@ def parseCommandLineOptions(
     referenceLengths = samFilter.referenceLengths()
 
     if len(referenceLengths) == 1:
-        referenceId, genomeLength = referenceLengths.popitem()
+        _, genomeLength = referenceLengths.popitem()
     else:
         raise ValueError(
             "If you do not specify a reference sequence with "

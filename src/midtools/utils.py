@@ -1,10 +1,11 @@
-import colorlover as cl
 from collections import Counter
-from typing import Optional, TextIO, Iterable, Any, Union
+from collections.abc import Iterable
 from pathlib import Path
-from pysam import AlignedSegment
+from typing import Any, TextIO
 
+import colorlover as cl
 from dark.process import Executor
+from pysam import AlignedSegment
 
 from midtools.offsets import OffsetBases
 
@@ -23,7 +24,7 @@ def baseCountsToStr(counts: OffsetBases | Counter[str]) -> str:
 
 
 def nucleotidesToStr(
-    nucleotides: dict[int, Union[Counter, OffsetBases]], prefix: str = ""
+    nucleotides: dict[int, Counter | OffsetBases], prefix: str = ""
 ) -> str:
     """
     Convert offsets and base counts to a string.
@@ -45,10 +46,10 @@ def nucleotidesToStr(
 
 
 def commonest(
-    counts: Union[Counter, OffsetBases],
+    counts: Counter | OffsetBases,
     drawBreaker: str,
-    drawFp: Optional[TextIO] = None,
-    drawMessage: Optional[str] = None,
+    drawFp: TextIO | None = None,
+    drawMessage: str | None = None,
 ) -> str:
     """
     Return the key of the Counter instance that is the most common.
@@ -98,7 +99,7 @@ def fastaIdentityTable(
     filename: Path,
     outputFilename: Path,
     verbose: bool,
-    filename2: Optional[Path] = None,
+    filename2: Path | None = None,
 ) -> None:
     """
     Call fasta-identity-table.py to produce an HTML identity table
@@ -118,7 +119,7 @@ def fastaIdentityTable(
 
     e = Executor()
     e.execute(
-        "fasta-identity-table.py --showGaps --showLengths --footer "
+        "fasta-identity-table.py --showGaps --showLengths "
         "--removeDescriptions %s %s < %s > %s"
         % (" ".join(colorArgs), file2arg, filename, outputFilename)
     )

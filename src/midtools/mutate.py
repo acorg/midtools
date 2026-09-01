@@ -1,4 +1,4 @@
-from random import uniform, choice
+from random import choice, uniform
 
 from dark.reads import Read
 

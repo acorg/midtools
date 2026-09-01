@@ -1,9 +1,8 @@
 import itertools
-from typing import Any
 from collections import UserList
 from collections.abc import Hashable
-
-from heapq import heappush, heappop
+from heapq import heappop, heappush
+from typing import Any
 
 _REMOVED = object()
 
@@ -48,7 +47,7 @@ class PriorityQueue(UserList):
     def pop(self, index=0) -> Any:
         "Remove and return the lowest priority task. Raise KeyError if empty."
         while self.data:
-            priority, count, task = heappop(self.data)
+            _, _, task = heappop(self.data)
             if task is not _REMOVED:
                 del self._entries[task]
                 self._validCount -= 1

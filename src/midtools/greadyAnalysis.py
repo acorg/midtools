@@ -1,8 +1,8 @@
 from os.path import join
-from pysam import AlignmentFile
 
 from dark.reads import Read, Reads
 from dark.sam import samfile
+from pysam import AlignmentFile
 
 from midtools.analysis import ReadAnalysis
 from midtools.offsets import OffsetBases
@@ -89,12 +89,12 @@ class GreadyAnalysis(ReadAnalysis):
             (
                 genomeLength,
                 alignedReads,
-                readCountAtOffset,
-                baseCountAtOffset,
+                _,
+                _,
                 readsAtOffset,
                 significantOffsets,
-                samFilter,
-                paddedSAM,
+                _,
+                _,
             ) = analysis
         else:
             return
@@ -115,8 +115,8 @@ class GreadyAnalysis(ReadAnalysis):
 
         consensusFilename = join(outputDir, "reference-consensus.sam")
         nonConsensusFilename = join(outputDir, "reference-non-consensus.sam")
-        self.report("    Writing consensus SAM to", consensusFilename)
-        self.report("    Writing non-consensus SAM to", nonConsensusFilename)
+        self.report("    Saving consensus SAM to", consensusFilename)
+        self.report("    Saving non-consensus SAM to", nonConsensusFilename)
 
         with samfile(alignmentFile) as sam:
             consensusAlignment = AlignmentFile(
@@ -187,7 +187,7 @@ class GreadyAnalysis(ReadAnalysis):
             consensus[offset].unincorporateBase(base)
 
         consensusInfoFilename = join(outputDir, "reference-consensus.txt")
-        self.report("    Writing consensus info to", consensusInfoFilename)
+        self.report("    Saving consensus info to", consensusInfoFilename)
 
         with open(consensusInfoFilename, "w") as fp:
             consensusSequence = []
@@ -234,7 +234,7 @@ class GreadyAnalysis(ReadAnalysis):
             "gready-consensus-%s" % referenceId, "".join(consensusSequence)
         )
         consensusFilename = join(outputDir, "reference-consensus.fasta")
-        self.report("    Writing gready consensus info to", consensusFilename)
+        self.report("    Saving gready consensus info to", consensusFilename)
         Reads([consensusRead]).save(consensusFilename)
 
         return {

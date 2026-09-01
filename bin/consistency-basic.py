@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
+from random import uniform
+
 import plotly
 import plotly.graph_objs as go
-
-from random import uniform
-from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
+from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
 
 from midtools.options import addCommandLineOptions, parseCommandLineOptions
 

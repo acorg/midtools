@@ -1,9 +1,9 @@
-from tempfile import mkdtemp
+from collections import defaultdict
+from collections.abc import Callable
+from itertools import chain
 from os import unlink
 from pathlib import Path
-from itertools import chain
-from collections import defaultdict
-from typing import Callable
+from tempfile import mkdtemp
 
 from dark.dna import compareDNAReads
 from dark.process import Executor
@@ -20,12 +20,12 @@ else:
 
 from midtools.match import matchToString
 from midtools.reference import (
+    Reference,
     getReferenceIds,
     getReferenceLength,
-    Reference,
     readReferenceGenomes,
 )
-from midtools.utils import fastaIdentityTable, s, quoted
+from midtools.utils import fastaIdentityTable, quoted, s
 
 
 class ReadAnalysis:
@@ -192,7 +192,7 @@ class ReadAnalysis:
         """
         shortAlignmentFilename = self.shortAlignmentFilename[alignmentFile]
         filename = outputDir / (shortAlignmentFilename + ".stats")
-        self.report("  Writing alignment statistics to", filename)
+        self.report("  Saving alignment statistics to", filename)
         e = Executor()
         e.execute(
             f"sam-reference-read-counts.py {quoted(alignmentFile)} > {quoted(filename)}"
@@ -214,7 +214,7 @@ class ReadAnalysis:
         @param outputDir: The C{Path} to the output directory.
         """
         referencesFilename = outputDir / "references.fasta"
-        self.report("  Writing FASTA for mapped-to references to", referencesFilename)
+        self.report("  Saving FASTA for mapped-to references to", referencesFilename)
         with open(referencesFilename, "w") as fp:
             for referenceId in sorted(result):
                 print(
@@ -225,7 +225,7 @@ class ReadAnalysis:
 
         consensusesFilename = outputDir / "consensuses.fasta"
         self.report(
-            "  Writing FASTA consensus for mapped-to references to", consensusesFilename
+            "  Saving FASTA consensus for mapped-to references to", consensusesFilename
         )
         with open(consensusesFilename, "w") as fp:
             for referenceId in sorted(result):
@@ -236,7 +236,7 @@ class ReadAnalysis:
                 )
 
         htmlFilename = outputDir / "consensus-vs-reference.html"
-        self.report("  Writing consensus vs reference identity table to", htmlFilename)
+        self.report("  Saving consensus vs reference identity table to", htmlFilename)
         fastaIdentityTable(
             consensusesFilename,
             htmlFilename,
@@ -245,7 +245,7 @@ class ReadAnalysis:
         )
 
         htmlFilename = outputDir / "consensus-vs-consensus.html"
-        self.report("  Writing consensus vs consensus identity table to", htmlFilename)
+        self.report("  Saving consensus vs consensus identity table to", htmlFilename)
         fastaIdentityTable(consensusesFilename, htmlFilename, self.verbose)
 
     def _writeOverallResultSummary(
@@ -261,7 +261,7 @@ class ReadAnalysis:
         @param outputDir: The C{Path} to the output directory.
         """
         filename = outputDir / "result-summary.txt"
-        self.report("Writing overall result summary to", filename)
+        self.report("Saving overall result summary to", filename)
         with open(filename, "w") as fp:
             for alignmentFilename in sorted(results):
                 print(f"Alignment file {quoted(alignmentFilename)}", file=fp)
@@ -346,11 +346,11 @@ class ReadAnalysis:
         @param outputDir: The C{Path} to the output directory.
         """
         filename = outputDir / "result-summary-summary.txt"
-        self.report("Writing overall result summary summary to", filename)
+        self.report("Saving overall result summary summary to", filename)
 
         with open(filename, "w") as fp:
             for alignmentFilename in sorted(results):
-                print(f"{str(alignmentFilename)}", file=fp)
+                print(f"{alignmentFilename!s}", file=fp)
                 resultSummary = []
                 for referenceId in sorted(results[alignmentFilename]):
                     result = results[alignmentFilename][referenceId]
@@ -396,7 +396,7 @@ class ReadAnalysis:
                 self.outputDir.mkdir()
         else:
             self.outputDir = Path(mkdtemp())
-            print("Writing output files to %s" % self.outputDir)
+            print("Saving output files to %s" % self.outputDir)
         return self.outputDir
 
     def _alignmentOutputDir(self, alignmentFile: Path, outputDir: Path) -> Path:

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import sys
-from math import log10
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from dark.fasta import FastaReads
 from dark.process import Executor
 from dark.reads import Read, Reads
-from dark.sam import SAMFilter, PaddedSAM, samfile
+from dark.sam import PaddedSAM, SAMFilter, samfile
 from dark.utils import pct
 
 if TYPE_CHECKING:
@@ -16,12 +15,12 @@ if TYPE_CHECKING:
 
 from midtools.offsets import analyzeOffsets, findSignificantOffsets
 from midtools.plotting import (
-    plotSAM,
-    plotCoverageAndSignificantLocations,
     plotBaseFrequencies,
+    plotCoverageAndSignificantLocations,
+    plotSAM,
 )
 from midtools.read import AlignedRead
-from midtools.utils import baseCountsToStr, commas, quoted, s, alignmentQuality
+from midtools.utils import alignmentQuality, baseCountsToStr, commas, quoted, s
 
 
 def _getAlignedReferenceIds(alignmentFiles: list[Path]) -> set[str]:
@@ -43,7 +42,7 @@ def _getAlignedReferenceIds(alignmentFiles: list[Path]) -> set[str]:
 
 
 def getReferenceIds(
-    readAnalysis: ReadAnalysis, referenceIds: Optional[list[str]]
+    readAnalysis: ReadAnalysis, referenceIds: list[str] | None
 ) -> set[str]:
     """
     Figure out which reference ids we can process.
@@ -113,7 +112,7 @@ def getReferenceIds(
     return referenceIds
 
 
-def getReferenceLength(referenceId: str, alignmentFile: Path) -> Optional[int]:
+def getReferenceLength(referenceId: str, alignmentFile: Path) -> int | None:
     """
     Look for a reference name in a BAM file and return its length.
 
@@ -348,7 +347,7 @@ class Reference:
         e = Executor()
 
         e.execute(
-            f"make-consensus.py --reference {quoted(referenceFilename)} "
+            f"make-consensus.py --ivar --reference {quoted(referenceFilename)} "
             f"--bam {quoted(self.alignmentFile)} | "
             f"filter-fasta.py --quiet "
             f"--idLambda 'lambda _: \"consensus-{self.id}-samtools\"' "
@@ -376,15 +375,20 @@ class Reference:
         filename = self.outputDir / "base-frequencies.txt"
         self.readAnalysis.report("    Saving base nucleotide frequencies to", filename)
 
-        referenceLengthWidth = int(log10(len(self.read))) + 1
+        referenceLengthWidth = len(str(len(self.read)))
+        depths = [sum(bases.values()) for bases in self.baseCountAtOffset]
+        depthWidth = len(str(max(depths)))
 
         with open(filename, "w") as fp:
-            for offset in range(len(self.read)):
+            offsets = list(range(len(self.read)))
+            for offset, depth in zip(offsets, depths, strict=True):
                 print(
-                    "Location %*d: base counts %s"
+                    "Location %*d: depth %*d, base counts %s"
                     % (
                         referenceLengthWidth,
                         offset + 1,
+                        depthWidth,
+                        depth,
                         baseCountsToStr(self.baseCountAtOffset[offset]),
                     ),
                     file=fp,

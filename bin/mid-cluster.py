@@ -6,7 +6,6 @@ from midtools.analysis import ReadAnalysis
 from midtools.clusterAnalysis import ClusterAnalysis
 from midtools.options import addAnalysisCommandLineOptions
 
-
 if __name__ == "__main__":
     import argparse
 

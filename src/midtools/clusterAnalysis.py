@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections import defaultdict, Counter
-from typing import Iterable, Optional, TextIO, Iterator, TYPE_CHECKING
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, TextIO
 
 from dark.dna import compareDNAReads
 from dark.fasta import FastaReads
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from midtools.analysis import ReadAnalysis
 from midtools.clusters import ReadCluster, ReadClusters
 from midtools.match import matchToString
-from midtools.offsets import analyzeOffsets, findSignificantOffsets, OffsetBases
+from midtools.offsets import OffsetBases, analyzeOffsets, findSignificantOffsets
 from midtools.plotting import plotBaseFrequencies, plotConsistentComponents
 from midtools.read import AlignedRead
 from midtools.reference import Reference
@@ -37,7 +38,7 @@ class ConsistentComponent:
         will be created.
     """
 
-    def __init__(self, readCluster: Optional[ReadCluster] = None) -> None:
+    def __init__(self, readCluster: ReadCluster | None = None) -> None:
         self.readCluster = readCluster or ReadCluster()
 
     def __len__(self) -> int:
@@ -397,7 +398,7 @@ def connectedComponentsByOffset(
     @return: A generator that yields C{Component} instances.
     """
     while significantReads:
-        significantRead = sorted(significantReads)[0]
+        significantRead = min(significantReads)
         significantReads.remove(significantRead)
         component = {significantRead}
         offsets = set(significantRead.significantOffsets)
@@ -495,8 +496,8 @@ class ClusterAnalysis:
 
         (
             consensusRead,
-            unwantedReads,
-            wantedCcReadCount,
+            _,
+            _,
             consensusReadCountAtOffset,
             consensusWantedReadsBaseCountAtOffset,
         ) = self.saveClosestReferenceConsensus(
@@ -589,7 +590,7 @@ class ClusterAnalysis:
         )
         infoFilename = reference.outputDir / "consistent-components-plot.txt"
         self.readAnalysis.report(
-            "    Writing consistent connected component info to", infoFilename
+            "    Saving consistent connected component info to", infoFilename
         )
 
         plotConsistentComponents(
@@ -998,7 +999,7 @@ class ClusterAnalysis:
         """
         filename = reference.outputDir / "reference-alternate-consensus.txt"
         self.readAnalysis.report(
-            f"    Writing alternate consensus info to {str(filename)!r}"
+            f"    Saving alternate consensus info to {str(filename)!r}"
         )
         alternateConsensus = []
 
@@ -1139,7 +1140,7 @@ class ClusterAnalysis:
         """
         filename = reference.outputDir / "consensus-base-frequencies.html"
         self.readAnalysis.report(
-            "    Writing consensus base frequency plot to", filename
+            "    Saving consensus base frequency plot to", filename
         )
 
         title = (
@@ -1195,7 +1196,7 @@ class ClusterAnalysis:
         @param components: A C{list} of C{Component} instances.
         """
         filename = reference.outputDir / "component-summary.txt"
-        self.readAnalysis.report(f"    Writing analysis summary to {quoted(filename)}.")
+        self.readAnalysis.report(f"    Saving analysis summary to {quoted(filename)}.")
 
         with open(filename, "w") as fp:
             print(
@@ -1217,7 +1218,7 @@ class ClusterAnalysis:
             for count, component in enumerate(components, start=1):
                 filename = reference.outputDir / ("component-%d.txt" % count)
                 self.readAnalysis.report(
-                    f"    Writing component {count} summary to {quoted(filename)}."
+                    f"    Saving component {count} summary to {quoted(filename)}."
                 )
                 with open(filename, "w") as fp2:
                     component.summarize(fp2, count, reference.read.sequence)

@@ -5,7 +5,6 @@ import sys
 from midtools.options import addCommandLineOptions, parseCommandLineOptions
 from midtools.plotting import plotBaseFrequencies
 
-
 if __name__ == "__main__":
     import argparse
 

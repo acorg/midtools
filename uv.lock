@@ -674,7 +674,7 @@ wheels = [
 
 [[package]]
 name = "dark-matter"
-version = "7.1.18"
+version = "7.1.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bio" },
@@ -709,7 +709,7 @@ dependencies = [
     { name = "types-requests" },
     { name = "xlsxwriter" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/b7/01dd0c954f25f435e2920431356d2c7e701f5852e9d6da69df3710e86794/dark_matter-7.1.18.tar.gz", hash = "sha256:0cdba6033fef443737ee15f149138e8702234eca4b989efec88a163b7bbbd639", size = 485609, upload-time = "2026-04-09T16:11:20.035Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/7a/01aca8a73d519239ef44c73f05ac88c60999a542e3484799a9bed1218119/dark_matter-7.1.19.tar.gz", hash = "sha256:161b983e965ba72be83c8e40b1a7a656db8420b3024e3e486b4210ad07e66b00", size = 486186, upload-time = "2026-04-10T17:48:58.654Z" }
 
 [[package]]
 name = "decorator"
@@ -1387,7 +1387,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "colorlover", specifier = ">=0.3.0" },
-    { name = "dark-matter", specifier = ">=7.1.18" },
+    { name = "dark-matter", specifier = ">=7.1.19" },
     { name = "plotly", specifier = ">=6.6.0" },
 ]
 

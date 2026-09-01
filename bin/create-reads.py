@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import sys
-from random import uniform, normalvariate
 from math import log10
+from random import normalvariate, uniform
 
 from dark.reads import Read, addFASTACommandLineOptions, parseFASTACommandLineOptions
 

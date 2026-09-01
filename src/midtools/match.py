@@ -1,5 +1,5 @@
+
 from dark.reads import Read
-from typing import Optional
 
 
 def _pct(a: int, b: int) -> float:
@@ -13,7 +13,7 @@ def _pct(a: int, b: int) -> float:
     return 100.0 * a / b if b else 0.0
 
 
-def _pp(mesg: str, count: int, len1: int, len2: Optional[int] = None) -> str:
+def _pp(mesg: str, count: int, len1: int, len2: int | None = None) -> str:
     """
     Format a message followed by an integer count and a percentage (or
     two, if the sequence lengths are unequal).
@@ -45,7 +45,7 @@ def matchToString(
     read2: Read,
     strict: bool = False,
     indent: str = "",
-    offsets: Optional[set[int]] = None,
+    offsets: set[int] | None = None,
 ) -> str:
     """
     Format a DNA match as a string.

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import ValuesView
 from itertools import count
-from typing import Optional, TextIO, ValuesView
+from typing import TextIO
 
 from dark.reads import Read
 
@@ -477,7 +478,7 @@ class ReadClusters:
         )
 
     def analyze(
-        self, cutoff: float, fp: Optional[TextIO] = None
+        self, cutoff: float, fp: TextIO | None = None
     ) -> ValuesView[ReadCluster]:
         """
         Perform the cluster analysis, up to a given distance cut-off.

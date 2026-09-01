@@ -1,35 +1,34 @@
 from __future__ import annotations
 
 import sys
+from collections import Counter, defaultdict
+from itertools import cycle
+from json import dump
+from operator import itemgetter
 from pathlib import Path
 from random import uniform
-import plotly
-from plotly.subplots import make_subplots
-import plotly.graph_objs as go
-import plotly.express as px
-from operator import itemgetter
-from json import dump
-from itertools import cycle
-from collections import Counter, defaultdict
 from textwrap import wrap
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
+import plotly
+import plotly.express as px
+import plotly.graph_objs as go
 from dark.dna import compareDNAReads
 from dark.fasta import FastaReads
 from dark.sam import SAMFilter
+from plotly.subplots import make_subplots
 
 if TYPE_CHECKING:
     from midtools.clusterAnalysis import Component
     from midtools.reference import Reference
-from midtools.entropy import entropy2, MAX_ENTROPY
+from midtools.entropy import MAX_ENTROPY, entropy2
 from midtools.match import matchToString
-from midtools.utils import s, baseCountsToStr
-
+from midtools.utils import baseCountsToStr, s
 
 try:
     # This relies on the private Cambridge/Charite HBV repo.
+    from pyhbv.genotype import genotypeKey, getGenotype
     from pyhbv.paperDieter import GENOTYPE_COLOR
-    from pyhbv.genotype import getGenotype, genotypeKey
     from pyhbv.samples import sampleIdKey
 except ImportError:
     haveHBV = False
@@ -39,14 +38,13 @@ except ImportError:
     def genotypeKey(genotype: str) -> tuple[int, str]:
         return 0, genotype
 
-    def getGenotype(sample: str, trimSubgenotype: bool = True) -> Optional[str]:
+    def getGenotype(sample: str, trimSubgenotype: bool = True) -> str | None:
         return None
 
     def sampleIdKey(id_: str) -> tuple[str, int, str]:
         return id_, 0, ""
 else:
     haveHBV = True
-
 
 
 def plotSAM(
@@ -167,8 +165,7 @@ def plotAllReferencesSAM(
         # then the scale factor is 1.0 for all sequence ids (the keys of the
         # referenceLengths dict).
         referenceScaleFactor = {
-            id_: maxReferenceLength / length
-            for id_, length in referenceLengths.items()
+            id_: maxReferenceLength / length for id_, length in referenceLengths.items()
         }
         # The referenceGenotype dict allows for accounting of HBV sample
         # genotypes and also the genotype labels in the legend.
@@ -447,7 +444,7 @@ def _plotBaseFrequenciesEntropy(
 
         entropyInfo.append((entropy2(list(baseCountAtOffset[offset].elements())), text))
 
-    assert all([ent <= MAX_ENTROPY for ent, _ in entropyInfo])
+    assert all(ent <= MAX_ENTROPY for ent, _ in entropyInfo)
 
     # We don't have to sort if we're making a histogram, but we're expected
     # to return a sorted values list, so we sort unconditionally.
@@ -685,15 +682,15 @@ def plotBaseFrequencies(
     baseCountAtOffset: list[Counter[str]],
     readCountAtOffset: list[int],
     outfile: Path,
-    title: Optional[str] = None,
+    title: str | None = None,
     titleFontSize: int = 12,
     axisFontSize: int = 12,
     yRange: tuple[float, float] = (0.0, 1.0),
-    sampleName: Optional[str] = None,
-    valuesFile: Optional[Path] = None,
+    sampleName: str | None = None,
+    valuesFile: Path | None = None,
     minReads: int = 5,
     homogeneousCutoff: float = 0.9,
-    sortOn: Optional[str] = None,
+    sortOn: str | None = None,
     histogram: bool = False,
     show: bool = False,
 ) -> None:
@@ -827,7 +824,7 @@ def plotCoverageAndSignificantLocations(
     genomeLength: int,
     significantOffsets: list[int],
     outfile: Path,
-    title: Optional[str] = None,
+    title: str | None = None,
     show: bool = False,
 ) -> None:
     """
@@ -986,8 +983,7 @@ def plotConsistentComponents(
                 if len(cc.reads) < minReadsPerConsistentComponent:
                     continue
                 ccSummary = (
-                    "Consistent component %d/%d. "
-                    "Read count %d, offsets covered %d/%d"
+                    "Consistent component %d/%d. Read count %d, offsets covered %d/%d"
                 ) % (
                     ccCount,
                     len(component.consistentComponents),

@@ -5,7 +5,6 @@ from itertools import chain
 from midtools.greadyAnalysis import GreadyAnalysis
 from midtools.options import addAnalysisCommandLineOptions
 
-
 if __name__ == "__main__":
     import argparse
 

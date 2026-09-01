@@ -7,7 +7,6 @@ from math import log10
 from midtools.options import addCommandLineOptions, parseCommandLineOptions
 from midtools.utils import baseCountsToStr
 
-
 if __name__ == "__main__":
     import argparse
 

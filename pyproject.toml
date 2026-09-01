@@ -27,7 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "colorlover>=0.3.0",
-    "dark-matter>=7.1.18",
+    "dark-matter>=7.1.19",
     "plotly>=6.6.0",
 ]
 
@@ -60,3 +60,6 @@ dev = [
     "nox>=2026.2.9",
     "pytest>=9.0.2",
 ]
+
+[tool.ruff.lint]
+ignore = ["UP031", "C408", "C401", "C402", "C417", "RUF015", "PERF402", "N999"]

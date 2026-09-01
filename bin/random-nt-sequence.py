@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from random import choice
 import argparse
+from random import choice
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,

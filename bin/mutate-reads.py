@@ -2,11 +2,10 @@
 
 import sys
 
-from midtools.mutate import mutateRead
-from midtools.utils import s
-
 from dark.reads import addFASTACommandLineOptions, parseFASTACommandLineOptions
 
+from midtools.mutate import mutateRead
+from midtools.utils import s
 
 if __name__ == "__main__":
     import argparse
