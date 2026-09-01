@@ -130,7 +130,7 @@ def plotConsistency(
     layout = go.Layout(layoutDict)
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outfile, auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=outfile, auto_open=show)
 
 
 if __name__ == "__main__":

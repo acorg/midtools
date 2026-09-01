@@ -93,7 +93,7 @@ def plotScores(sampleData, outfile):
 
     layout = go.Layout(xaxis=xaxis, yaxis=yaxis)
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=outfile, show_link=False)
+    plotly.offline.plot(fig, filename=outfile)
 
 
 if __name__ == "__main__":
