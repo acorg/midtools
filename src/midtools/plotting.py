@@ -123,7 +123,7 @@ def plotSAM(
         hovermode="closest",
     )
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
 
 
 def plotAllReferencesSAM(
@@ -312,7 +312,7 @@ def plotAllReferencesSAM(
 
     fig.update_layout(legend_title_text="Genotype (total reads)")
 
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
 
 
 def _plotSortedMaxBaseFrequencies(
@@ -417,7 +417,7 @@ def _plotSortedMaxBaseFrequencies(
         },
     )
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
     return frequencyInfo
 
 
@@ -516,7 +516,7 @@ def _plotBaseFrequenciesEntropy(
         },
     )
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
     return entropyInfo
 
 
@@ -602,7 +602,7 @@ def _plotBaseFrequenciesAllOffsets(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
 
 
 def _plotBaseFrequencies(
@@ -674,7 +674,7 @@ def _plotBaseFrequencies(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
 
 
 def plotBaseFrequencies(
@@ -843,7 +843,7 @@ def plotCoverageAndSignificantLocations(
             }
         )
 
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
 
 
 def plotConsistentComponents(
@@ -1125,4 +1125,4 @@ def plotConsistentComponents(
     )
 
     fig = go.Figure(data=data, layout=layout)
-    plotly.offline.plot(fig, filename=str(outfile), auto_open=show, show_link=False)
+    plotly.offline.plot(fig, filename=str(outfile), auto_open=show)
